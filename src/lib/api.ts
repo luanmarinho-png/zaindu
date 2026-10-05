@@ -25,3 +25,6 @@ export function cleanLogo(value: unknown): string | null {
   if (typeof value !== 'string' || value.length > MAX_LOGO_CHARS || !/^data:image\/(png|jpeg|webp|svg\+xml);base64,[a-z0-9+/=]+$/i.test(value)) return null;
   return value;
 }
+
+// Fotos do prontuário: SVG fica de fora porque, aberto direto no navegador, roda script no domínio do app.
+export const SAFE_IMAGE = /^image\/(jpeg|png|webp|gif|heic|heif)$/;

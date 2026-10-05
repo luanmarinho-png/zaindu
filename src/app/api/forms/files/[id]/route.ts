@@ -19,7 +19,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     if (!file) return NextResponse.json({ error: 'Arquivo não encontrado.' }, { status: 404 });
     const contentType = typeof file.metadata?.contentType === 'string' ? file.metadata.contentType : 'application/octet-stream';
     return new Response(Readable.toWeb(bucket.openDownloadStream(fileId)) as ReadableStream, {
-      headers: { 'Content-Type': contentType, 'Content-Length': String(file.length), 'Content-Disposition': `attachment; filename="${encodeURIComponent(file.filename)}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' },
+      headers: { 'Content-Type': contentType, 'Content-Length': String(file.length), 'Content-Disposition': `attachment; filename="${encodeURIComponent(file.filename)}"`, 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" },
     });
   } catch {
     return NextResponse.json({ error: 'Não foi possível abrir o arquivo.' }, { status: 503 });

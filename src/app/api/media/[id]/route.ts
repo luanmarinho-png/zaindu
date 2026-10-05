@@ -3,6 +3,7 @@ import { Readable } from 'node:stream';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccess } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
+import { SAFE_IMAGE } from '@/lib/api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,8 +27,9 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
     if (found.status === 404) return NextResponse.json({ error: 'Imagem não encontrada.' }, { status: 404 });
     const { bucket, file } = found;
     const stream = bucket.openDownloadStream(file._id);
-    const contentType = typeof file.metadata?.contentType === 'string' ? file.metadata.contentType : 'application/octet-stream';
-    return new Response(Readable.toWeb(stream) as ReadableStream, { headers: { 'Content-Type': contentType, 'Content-Length': String(file.length), 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff' } });
+    const stored = typeof file.metadata?.contentType === 'string' ? file.metadata.contentType : '';
+    const contentType = SAFE_IMAGE.test(stored) ? stored : 'application/octet-stream';
+    return new Response(Readable.toWeb(stream) as ReadableStream, { headers: { 'Content-Type': contentType, 'Content-Length': String(file.length), 'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff', 'Content-Security-Policy': "default-src 'none'; sandbox" } });
   } catch {
     return NextResponse.json({ error: 'Não foi possível abrir a imagem.' }, { status: 503 });
   }

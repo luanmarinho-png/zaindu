@@ -3,6 +3,7 @@ import { Readable } from 'node:stream';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccess } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
+import { SAFE_IMAGE } from '@/lib/api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
     const file = form.get('image');
     const rawMetadata = form.get('metadata');
     if (!(file instanceof File) || !file.size || typeof rawMetadata !== 'string') return NextResponse.json({ error: 'Selecione uma imagem.' }, { status: 400 });
-    if (!file.type.startsWith('image/')) return NextResponse.json({ error: 'O arquivo precisa ser uma imagem.' }, { status: 415 });
+    if (!SAFE_IMAGE.test(file.type)) return NextResponse.json({ error: 'Use uma imagem JPG, PNG, WEBP, GIF ou HEIC.' }, { status: 415 });
     if (file.size > MAX_IMAGE_BYTES) return NextResponse.json({ error: 'A imagem deve ter até 12 MB.' }, { status: 413 });
     const metadata = JSON.parse(rawMetadata) as Record<string, unknown>;
     const requestedId = String(metadata.storageKey || '');

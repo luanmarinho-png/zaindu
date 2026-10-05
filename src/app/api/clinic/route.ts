@@ -1,7 +1,8 @@
+import type { Db } from 'mongodb';
 import { NextRequest, NextResponse } from 'next/server';
 import { brandOf, clinics, getAccess, states } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
-import { canWrite, readableStore, STORE_KEYS } from '@/lib/clinic/permissions';
+import { canWrite, readableStore, STORE_KEYS, type Module } from '@/lib/clinic/permissions';
 import type { Store } from '@/lib/clinic/store';
 
 export const runtime = 'nodejs';
@@ -26,6 +27,25 @@ function cleanStore(value: Record<string, unknown>) {
     media: keepPatients(value.media),
     profiles: Object.fromEntries(Object.entries(profiles).filter(([patientId]) => patientIds.has(patientId))),
   };
+}
+
+const idOf = (item: unknown) => String((item as Record<string, unknown> | null)?.id || '');
+
+// Pela agenda só se cadastra paciente novo; editar e excluir exige o módulo Pacientes.
+// Excluir paciente apaga o prontuário dele, então quem não tem Prontuário não exclui quem já tem registro clínico.
+async function guardPatients(database: Db, clinicId: string, modules: Module[], next: Record<string, unknown>[]): Promise<unknown[] | string> {
+  const current = ((await states(database).findOne({ _id: clinicId }, { projection: { 'data.patients': 1, 'data.notes': 1, 'data.profiles': 1, 'data.media': 1 } }))?.data || {}) as Record<string, unknown>;
+  const existing = Array.isArray(current.patients) ? current.patients as Record<string, unknown>[] : [];
+  const existingIds = new Set(existing.map(idOf));
+  const list = modules.includes('pacientes') ? next : [...existing, ...next.filter(item => !existingIds.has(idOf(item)))];
+  if (modules.includes('prontuario')) return list;
+  const kept = new Set(list.map(idOf));
+  const clinical = new Set([
+    ...[current.notes, current.media].flatMap(items => Array.isArray(items) ? items.map(item => String((item as Record<string, unknown>)?.patientId || '')) : []),
+    ...Object.keys((current.profiles as Record<string, unknown>) || {}),
+  ]);
+  const blocked = existing.filter(patient => !kept.has(idOf(patient)) && clinical.has(idOf(patient)));
+  return blocked.length ? 'Este paciente tem prontuário. Só quem tem acesso ao prontuário pode excluí-lo.' : list;
 }
 
 const validFor = (key: keyof Store, value: unknown) =>
@@ -63,16 +83,22 @@ export async function PUT(request: NextRequest) {
     if (!access.clinicId) return NextResponse.json({ error: 'Escolha uma clínica.', needsClinic: true }, { status: 409 });
     const payload = await request.json().catch(() => null);
     if (!payload?.data || typeof payload.data !== 'object') return NextResponse.json({ error: 'Os dados da clínica estão incompletos.' }, { status: 400 });
-    const incoming = payload.data as Record<string, unknown>;
+    const incoming = { ...(payload.data as Record<string, unknown>) };
     const sent = STORE_KEYS.filter(key => key in incoming);
     const denied = sent.filter(key => !canWrite(key, access.modules));
     if (denied.length) return NextResponse.json({ error: 'Seu usuário não pode alterar esta parte da clínica.' }, { status: 403 });
     const invalid = sent.filter(key => !validFor(key, incoming[key]));
     if (invalid.length) return NextResponse.json({ error: 'Os dados da clínica estão incompletos.' }, { status: 400 });
     if (!sent.length) return NextResponse.json({ saved: true }, { headers: noStore });
+    const database = await getDatabase();
+    if (sent.includes('patients')) {
+      const guarded = await guardPatients(database, access.clinicId, access.modules, incoming.patients as Record<string, unknown>[]);
+      if (typeof guarded === 'string') return NextResponse.json({ error: guarded }, { status: 403 });
+      incoming.patients = guarded;
+    }
     const update: Record<string, unknown> = { updatedAt: new Date() };
     for (const key of sent) update[`data.${key}`] = incoming[key];
-    await states(await getDatabase()).updateOne({ _id: access.clinicId }, { $set: update }, { upsert: true });
+    await states(database).updateOne({ _id: access.clinicId }, { $set: update }, { upsert: true });
     return NextResponse.json({ saved: true }, { headers: noStore });
   } catch {
     return NextResponse.json({ error: 'Não foi possível salvar no MongoDB. Verifique a conexão e tente novamente.' }, { status: 503 });

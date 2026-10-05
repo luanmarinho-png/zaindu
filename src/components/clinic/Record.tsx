@@ -364,7 +364,7 @@ function MediaModal({ kinds: MEDIA_KIND, appointments, patientId, onClose, onSav
       footer={<><span className="spacer" /><button type="button" className="z-btn secondary" onClick={onClose}>Cancelar</button><button type="submit" className="z-btn brand" disabled={busy}>{busy ? 'Enviando…' : 'Salvar imagem'}</button></>}
     >
       <div className="z-form-grid">
-        <Field label="Imagem" required full htmlFor="m-file"><input id="m-file" type="file" name="image" accept="image/*" required className="z-file" /></Field>
+        <Field label="Imagem" required full htmlFor="m-file"><input id="m-file" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif" required className="z-file" /></Field>
         <Field label="Categoria" htmlFor="m-kind"><select id="m-kind" name="kind" className="z-select" defaultValue="trichoscopy">{(Object.keys(MEDIA_KIND) as MediaAttachment['kind'][]).map(kind => <option key={kind} value={kind}>{MEDIA_KIND[kind]}</option>)}</select></Field>
         <Field label="Data da imagem" htmlFor="m-date"><input id="m-date" name="capturedAt" type="date" className="z-input" defaultValue={new Date().toISOString().slice(0, 10)} /></Field>
         <Field label="Legenda" full htmlFor="m-caption"><input id="m-caption" name="caption" className="z-input" placeholder="Ex.: frontal, vértex, lado direito" /></Field>

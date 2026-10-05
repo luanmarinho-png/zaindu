@@ -23,9 +23,8 @@ async function scope(requestedClinic: unknown): Promise<{ access: Access; clinic
 const view = (item: MemberDoc) => ({ email: item._id, username: item._id.replace(/@zaindu\.app$/, ''), name: item.name, role: item.role, modules: item.modules });
 
 function loginMessage(result: LoginResult): string {
-  if (result === 'unconfigured') return 'Acesso salvo. O login ainda precisa ser criado no Supabase: falta a chave SUPABASE_SECRET_KEY no servidor.';
-  if (result === 'exists') return 'Acesso salvo. Este usuário já tinha login e continua com a senha atual.';
-  if (result === 'updated') return 'Acesso salvo e senha atualizada.';
+  if (result === 'unconfigured') return 'Alterações salvas. A senha não mudou: falta a chave SUPABASE_SECRET_KEY no servidor.';
+  if (result === 'updated') return 'Usuário salvo com a senha definida agora.';
   return 'Usuário criado. Ele já pode entrar com o usuário e a senha definidos.';
 }
 
@@ -52,13 +51,15 @@ export async function POST(request: NextRequest) {
     if (!name) return fail('Informe o nome.', 400);
     if (!/^[a-z0-9._-]+@zaindu\.app$/.test(email) || !isClinicEmail(email)) return fail('Usuário pode ter só letras, números, ponto, hífen e sublinhado.', 400);
     if (adminEmails().includes(email)) return fail('Este usuário é reservado ao administrador.', 400);
-    if (password && password.length < MIN_PASSWORD) return fail(`A senha precisa de pelo menos ${MIN_PASSWORD} caracteres.`, 400);
+    // Senha sempre definida aqui: se alguém criou essa conta antes pelo cadastro público, a senha dela deixa de valer.
+    if (password.length < MIN_PASSWORD) return fail(`A senha precisa de pelo menos ${MIN_PASSWORD} caracteres.`, 400);
     const db = await getDatabase();
     if (!(await clinics(db).findOne({ _id: target.clinicId }, { projection: { _id: 1 } }))) return fail('Clínica não encontrada.', 404);
     const existing = await members(db).findOne({ _id: email });
     if (existing && existing.clinicId !== target.clinicId) return fail('Este usuário já pertence a outra clínica.', 409);
     if (existing) return fail('Este usuário já faz parte da equipe.', 409);
     const result = await upsertLogin(email, password, name).catch((error: Error) => error);
+    if (result === 'unconfigured') return fail('Falta a chave SUPABASE_SECRET_KEY no servidor para criar o login. Nada foi salvo.', 503);
     if (result instanceof Error) return fail(result.message.includes('password') ? 'Senha recusada pelo Supabase. Use uma senha mais forte.' : result.message, 400);
     const now = new Date();
     const modules = role === 'manager' ? [] : (Array.isArray(body?.modules) ? cleanModules(body.modules) : DEFAULT_MEMBER_MODULES);
