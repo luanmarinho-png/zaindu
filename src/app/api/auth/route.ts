@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { hasClinicSession } from '@/lib/auth';
+import { hasClinicSession, isClinicEmail } from '@/lib/auth';
 import { createClient, supabaseConfigured } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
@@ -23,8 +23,12 @@ export async function POST(request: NextRequest) {
   } catch { return NextResponse.json({ error: 'Informe usuário e senha.' }, { status: 400 }); }
   if (!email || !password) return NextResponse.json({ error: 'Informe usuário e senha.' }, { status: 400 });
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return NextResponse.json({ error: 'Usuário ou senha incorretos.' }, { status: 401 });
+  if (!isClinicEmail(data.user?.email)) {
+    await supabase.auth.signOut();
+    return NextResponse.json({ error: 'Este usuário não tem acesso à clínica.' }, { status: 403 });
+  }
   return NextResponse.json({ authenticated: true });
 }
 
