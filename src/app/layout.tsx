@@ -1,9 +1,9 @@
 import type { Metadata } from 'next';
-import { Newsreader } from 'next/font/google';
+import { Inter } from 'next/font/google';
 import './design-system.css';
-import './globals.css';
+import './clinic.css';
 
-const display = Newsreader({ subsets: ['latin'], style: ['normal', 'italic'], weight: ['400'], variable: '--font-display' });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter', display: 'swap' });
 
 export const metadata: Metadata = {
   title: 'ZAINDU | Gestão clínica',
@@ -11,5 +11,14 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="pt-BR" className={display.variable}><body>{children}</body></html>;
+  return (
+    <html lang="pt-BR" className={inter.variable}>
+      <head>
+        {/* Switzer (títulos do DS SC) vem da Fontshare, que não está no Google Fonts. */}
+        <link rel="preconnect" href="https://api.fontshare.com" crossOrigin="" />
+        <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=switzer@400,500,600&display=swap" />
+      </head>
+      <body>{children}</body>
+    </html>
+  );
 }

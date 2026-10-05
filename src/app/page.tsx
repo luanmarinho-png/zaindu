@@ -1,249 +1,171 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Agenda } from '@/components/clinic/Agenda';
+import { AppointmentModal, quickPatient } from '@/components/clinic/AppointmentModal';
+import { Daily } from '@/components/clinic/Daily';
+import { Finance } from '@/components/clinic/Finance';
+import { Login, type AccessState } from '@/components/clinic/Login';
+import { Overview } from '@/components/clinic/Overview';
+import { PatientModal } from '@/components/clinic/PatientModal';
+import { Patients } from '@/components/clinic/Patients';
+import { Record } from '@/components/clinic/Record';
+import { Settings } from '@/components/clinic/Settings';
+import { Shell } from '@/components/clinic/Shell';
+import type { ClinicView } from '@/components/clinic/types';
+import { Toast } from '@/components/ui/Toast';
+import { cleanLocalStore, dayKey, initial, KEY, monthKey, readImageBlob, type Appointment, type Patient, type Store } from '@/lib/clinic/store';
 
-type Patient = { id: string; name: string; phone: string; email: string; since: string; notes: string };
-type Appointment = { id: string; patientId: string; date: string; time: string; type: string; status: 'Agendada' | 'Realizada' | 'Cancelada'; price: number; notes: string };
-type PatientProfile = { birthDate: string; occupation: string; communicationStyle: string; chiefComplaint: string; onset: string; progression: string; pattern: string; symptoms: string; triggers: string; comorbidities: string; surgicalHistory: string; familyHistory: string; medications: string; supplements: string; allergies: string; reproductiveHistory: string; dietAndStress: string; hairCare: string; chemicalTreatments: string; heatAndTraction: string; washRoutine: string; priorTreatments: string; relevantTests: string };
-type ClinicalNote = { id: string; patientId: string; appointmentId: string; date: string; reason: string; report: string; exam: string; pullTest: string; assessment: string; differential: string; plan: string; followUp: string; trichoDevice: string; magnification: string; frontal: string; vertex: string; temporalRight: string; temporalLeft: string; parietal: string; occipital: string; trichoMetrics: string; photoReference: string; tests: string; selectedFindings: string[] };
-type ClinicalTextKey = Exclude<keyof ClinicalNote,'selectedFindings'>;
-type MediaAttachment = { id: string; patientId: string; appointmentId: string; kind: 'patient' | 'before' | 'after' | 'trichoscopy'; caption: string; capturedAt: string; mimeType: string; sizeBytes: number; storageKey: string; createdAt: string };
-type ClinicSettings = { clinicName: string; professionalName: string; specialty: string; appointmentTypes: string[]; trichoscopyFindings: string[] };
-type Supply = { id:string; name:string; category:string; unit:string; unitCost:number; defaultQty:number };
-type Store = { supplies: Supply[]; knowledgeCost:number; targetMargin:number; patients: Patient[]; appointments: Appointment[]; notes: ClinicalNote[]; profiles: Record<string, PatientProfile>; media: MediaAttachment[]; settings: ClinicSettings; monthlyCosts: Record<string, { fixedCosts: number; investments: number }> };
-const KEY = 'raiz-viva-clinica-v1';
-const IMAGE_DB = 'raiz-viva-images-v1';
-type DailyVerse = { reference:string; theme:string; reflection:string };
-const dailyVerses:DailyVerse[] = [
-  {reference:'Provérbios 21:5',theme:'Planejamento e diligência',reflection:'A sabedoria deste versículo valoriza o planejamento cuidadoso e o trabalho constante na construção de prosperidade.'},
-  {reference:'Provérbios 16:3',theme:'Propósito e direção',reflection:'Dedique seus projetos a Deus, planeje com responsabilidade e siga com confiança e humildade.'},
-  {reference:'Provérbios 22:29',theme:'Excelência no trabalho',reflection:'A dedicação e a competência tornam o trabalho reconhecido. Continue aperfeiçoando seu serviço.'},
-  {reference:'Provérbios 24:3–4',theme:'Construir com sabedoria',reflection:'Um negócio sólido se constrói com sabedoria, entendimento e conhecimento — decisões consistentes importam.'},
-  {reference:'Provérbios 11:1',theme:'Honestidade nos negócios',reflection:'Integridade nos preços, nas promessas e no cuidado com cada pessoa é parte de uma gestão justa.'},
-  {reference:'Eclesiastes 3:1',theme:'Respeitar cada fase',reflection:'Há tempos diferentes para cada propósito. Uma fase difícil não define toda a sua trajetória.'},
-  {reference:'Gálatas 6:9',theme:'Perseverança',reflection:'Não desanime ao fazer o bem. Continue com constância; o fruto do trabalho pode levar tempo.'},
-  {reference:'Tiago 1:2–4',theme:'Maturidade nas provações',reflection:'As dificuldades podem fortalecer a perseverança e a maturidade para atravessar desafios.'},
-  {reference:'Provérbios 31:16–18',theme:'Iniciativa e boa administração',reflection:'A mulher descrita avalia oportunidades, trabalha com disposição e administra com atenção.'},
-];
-const verseForToday = () => { const key=dayKey(new Date()); const seed=[...key].reduce((value,char)=>(value*31+char.charCodeAt(0))>>>0,7); return dailyVerses[seed%dailyVerses.length]; };
-const defaultSettings: ClinicSettings = { clinicName: 'Sua clínica', professionalName: 'Profissional de saúde', specialty: 'Especialidade', appointmentTypes: ['Consulta','Retorno','Procedimento'], trichoscopyFindings: ['Variabilidade do diâmetro','Fios finos/velus','Unidades foliculares','Pontos amarelos','Pontos pretos','Pontos brancos','Descamação','Eritema perifolicular','Óstios foliculares','Fios quebrados'] };
-const initial: Store = {
-  supplies: [
-    {id:'s1',name:'Par de luvas de procedimento',category:'EPI',unit:'par',unitCost:1.2,defaultQty:1},{id:'s2',name:'Máscara descartável',category:'EPI',unit:'unidade',unitCost:0.6,defaultQty:1},{id:'s3',name:'Touca descartável',category:'EPI',unit:'unidade',unitCost:0.35,defaultQty:1},{id:'s4',name:'Campo / gaze / antisséptico',category:'Biossegurança',unit:'kit',unitCost:4,defaultQty:1},{id:'s5',name:'Kit/tubo para PRP',category:'PRP capilar',unit:'kit',unitCost:45,defaultQty:1},{id:'s6',name:'Seringa estéril',category:'PRP capilar',unit:'unidade',unitCost:1.5,defaultQty:1},{id:'s7',name:'Agulha estéril',category:'PRP capilar',unit:'unidade',unitCost:0.8,defaultQty:1},{id:'s9',name:'Ponteira/cartucho de microagulhamento',category:'MMP / microagulhamento',unit:'unidade',unitCost:18,defaultQty:1},{id:'s10',name:'Seringa para mescla',category:'MMP / mesclas',unit:'unidade',unitCost:1.5,defaultQty:1},{id:'s11',name:'Ativo/mescla capilar',category:'MMP / mesclas',unit:'dose',unitCost:25,defaultQty:1},{id:'s12',name:'LEDterapia: rateio por sessão',category:'Equipamentos',unit:'sessão',unitCost:8,defaultQty:1},{id:'s13',name:'Centrífuga: rateio/manutenção por sessão',category:'PRP capilar',unit:'sessão',unitCost:12,defaultQty:1},{id:'s14',name:'Coletor para perfurocortantes (rateio)',category:'Biossegurança',unit:'unidade',unitCost:0.5,defaultQty:1},{id:'s15',name:'Óculos de proteção / higienização (rateio)',category:'EPI',unit:'sessão',unitCost:1,defaultQty:1}], knowledgeCost:30, targetMargin:100,
-  patients: [], appointments: [], notes: [], profiles: {}, media: [], settings: defaultSettings, monthlyCosts: {},
-};
-const emptyProfile: PatientProfile = { birthDate:'',occupation:'',communicationStyle:'',chiefComplaint:'',onset:'',progression:'',pattern:'',symptoms:'',triggers:'',comorbidities:'',surgicalHistory:'',familyHistory:'',medications:'',supplements:'',allergies:'',reproductiveHistory:'',dietAndStress:'',hairCare:'',chemicalTreatments:'',heatAndTraction:'',washRoutine:'',priorTreatments:'',relevantTests:'' };
-const profileFields: [keyof PatientProfile,string,string][] = [
-  ['birthDate','Data de nascimento','date'],['occupation','Ocupação e exposição relevante','text'],['communicationStyle','Preferência de comunicação','select'],['chiefComplaint','Queixa principal e objetivo da consulta','textarea'],['onset','Início, duração e circunstâncias','textarea'],['progression','Evolução e velocidade de progressão','textarea'],['pattern','Distribuição/padrão percebido pela paciente','textarea'],['symptoms','Sintomas do couro cabeludo (prurido, dor, ardor, descamação etc.)','textarea'],['triggers','Eventos ou possíveis desencadeantes e datas (doença, cirurgia, estresse, parto etc.)','textarea'],['comorbidities','Comorbidades e condições clínicas','textarea'],['surgicalHistory','Histórico cirúrgico e internações relevantes','textarea'],['familyHistory','Histórico familiar de queda/alterações capilares','textarea'],['medications','Medicamentos em uso, dose, início e mudanças recentes','textarea'],['supplements','Vitaminas, suplementos e produtos em uso','textarea'],['allergies','Alergias/intolerâncias: substância, reação e gravidade conhecida','textarea'],['reproductiveHistory','Histórico menstrual/reprodutivo, quando pertinente e consentido','textarea'],['dietAndStress','Alimentação, mudanças de peso e estressores recentes','textarea'],['hairCare','Rotina e práticas de cuidado capilar','textarea'],['chemicalTreatments','Colorações, alisamentos e outros procedimentos químicos (produto/data)','textarea'],['heatAndTraction','Calor, penteados com tração, extensões e hábitos de tração','textarea'],['washRoutine','Frequência de lavagem e cuidados antes do exame','textarea'],['priorTreatments','Tratamentos capilares prévios: produto/procedimento, período, resposta e efeitos','textarea'],['relevantTests','Exames prévios relevantes: data, resultado e profissional solicitante','textarea'],
-];
-const noteGroups: {title:string;fields:[ClinicalTextKey,string,string][]}[] = [
-  { title:'Relato e avaliação clínica', fields:[['reason','Queixa/relato','O que a paciente relata?'],['report','Evolução desde a última consulta','Sintomas, mudanças, resposta relatada e datas'],['exam','Exame clínico do couro cabeludo e fios','Distribuição, densidade aparente, eritema, descamação, óstios foliculares, cicatriz, haste e observações'],['pullTest','Teste de tração (se realizado)','Local, técnica, resultado e observações'],['assessment','Impressão/avaliação profissional','Registro descritivo do profissional'],['differential','Hipóteses/diferenciais considerados','Registro profissional; não é gerado automaticamente'],['plan','Conduta/plano e orientações','Condutas acordadas e orientações'],['followUp','Acompanhamento/retorno','Prazo, metas de acompanhamento e pendências'],['tests','Exames complementares','Exame, data, resultado e interpretação profissional']] },
-  { title:'Tricoscopia', fields:[['trichoDevice','Equipamento e modo de exame','Marca/modelo; contato ou não contato'],['magnification','Aumento utilizado','Informe o aumento por imagem ou campo'],['frontal','Região frontal','Descreva os achados observados'],['vertex','Vértex/coroa','Descreva os achados observados'],['temporalRight','Região temporal direita','Descreva os achados observados'],['temporalLeft','Região temporal esquerda','Descreva os achados observados'],['parietal','Região parietal','Descreva os achados observados'],['occipital','Região occipital (comparação)','Descreva os achados observados'],['trichoMetrics','Métricas e achados por campo','Diâmetro/variabilidade das hastes, fios finos/velus, unidades foliculares e fios por unidade, pontos amarelos/brancos/pretos, óstios, sinais perifoliculares, eritema e descamação. Registre método/unidade e local.'],['photoReference','Registro fotográfico','Identificador/local da imagem e posição padronizada (frente, topo, laterais, occipital); anexos seguros serão adicionados depois']] },
-];
-const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n || 0);
-const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-const monthName = (value: Date | string) => new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(typeof value === 'string' ? new Date(`${value}-01T12:00:00`) : value);
-const makeId = () => typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now() + Math.random());
-function openImageDb(): Promise<IDBDatabase> { return new Promise((resolve,reject)=>{ const request=indexedDB.open(IMAGE_DB,1); request.onupgradeneeded=()=>request.result.createObjectStore('images'); request.onsuccess=()=>resolve(request.result); request.onerror=()=>reject(request.error); }); }
-async function saveImageBlob(key:string,blob:Blob):Promise<void>{const db=await openImageDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').put(blob,key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});db.close();}
-async function readImageBlob(key:string):Promise<Blob|undefined>{const db=await openImageDb();const value=await new Promise<Blob|undefined>((resolve,reject)=>{const req=db.transaction('images').objectStore('images').get(key);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});db.close();return value;}
-async function deleteImageBlob(key:string):Promise<void>{const db=await openImageDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').delete(key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});db.close();}
-
-function cleanLocalStore(value: Partial<Store> | null | undefined): Store {
-  const patients = (value?.patients || []).filter(patient => !/^(paciente demonstração|paciente teste|teste|demo patient)\b/i.test(patient.name.trim()));
-  const patientIds = new Set(patients.map(patient => patient.id));
-  return {
-    ...initial,
-    ...(value || {}),
-    patients,
-    appointments: (value?.appointments || []).filter(item => patientIds.has(item.patientId)),
-    notes: (value?.notes || []).filter(item => patientIds.has(item.patientId)).map(note => ({ ...note, selectedFindings: note.selectedFindings || [] })),
-    profiles: Object.fromEntries(Object.entries(value?.profiles || {}).filter(([id]) => patientIds.has(id))),
-    media: (value?.media || []).filter(item => patientIds.has(item.patientId)),
-    supplies: value?.supplies || initial.supplies,
-    knowledgeCost: value?.knowledgeCost ?? initial.knowledgeCost,
-    targetMargin: value?.targetMargin ?? initial.targetMargin,
-    settings: { ...defaultSettings, ...(value?.settings || {}) },
-    monthlyCosts: value?.monthlyCosts || {},
-  };
-}
-
-const communicationStyles = ['Direta e objetiva','Acolhedora e com tempo para conversar','Detalhada, com explicações completas','Visual, com exemplos e resumos','Prática, com passos simples por escrito','Prefere decidir no próprio ritmo'];
+type AppointmentDraft = { appointment?: Appointment; date: string; patientId?: string };
 
 export default function Home() {
   const [data, setData] = useState<Store>(initial);
-  const [month, setMonth] = useState(()=>monthKey(new Date()));
-  const [view, setView] = useState<'Visão geral' | 'Agenda' | 'Pacientes' | 'Prontuário' | 'Financeiro' | 'Configurações' | 'Todos os dias'>('Visão geral');
-  const [query, setQuery] = useState('');
-  const [sidebarCollapsed,setSidebarCollapsed]=useState(false);
-  const [mobileNavOpen,setMobileNavOpen]=useState(false);
-  const [supplyDraft,setSupplyDraft]=useState({name:'',category:'Personalizado',unit:'unidade',unitCost:'',defaultQty:'1'});
-  const [patientForm, setPatientForm] = useState(false);
-  const [appointmentForm, setAppointmentForm] = useState(false);
-  const [editingAppointmentId, setEditingAppointmentId] = useState('');
-  const [noteForm, setNoteForm] = useState(false);
-  const [editingNoteId, setEditingNoteId] = useState('');
-  const [activeAppointmentId,setActiveAppointmentId]=useState('');
-  const [profileForm, setProfileForm] = useState(false);
-  const [mediaForm, setMediaForm] = useState(false);
-  const [selectedPatientId, setSelectedPatientId] = useState('');
-  const [selectedAppointmentDate, setSelectedAppointmentDate] = useState(()=>dayKey(new Date()));
-  const [mediaUrls, setMediaUrls] = useState<Record<string,string>>({});
-  const [newAppointmentType, setNewAppointmentType] = useState('');
-  const [newTrichoFinding, setNewTrichoFinding] = useState('');
   const [ready, setReady] = useState(false);
-  const [accessState,setAccessState]=useState<'checking'|'setup'|'login'|'authenticated'|'error'>('checking');
-  const [accessUsername,setAccessUsername]=useState('');
-  const [accessPassword,setAccessPassword]=useState('');
-  const [showAccessPassword,setShowAccessPassword]=useState(false);
-  const [accessError,setAccessError]=useState('');
-  const [accessSubmitting,setAccessSubmitting]=useState(false);
-  const [syncStatus,setSyncStatus]=useState<'loading'|'saved'|'saving'|'error'>('loading');
-  const [syncError,setSyncError]=useState('');
-  const saveQueue=useRef<Promise<void>>(Promise.resolve());
-  const saveVersion=useRef(0);
+  const [access, setAccess] = useState<AccessState | 'authenticated'>('checking');
+  const [accessError, setAccessError] = useState('');
+  const [saveError, setSaveError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [view, setView] = useState<ClinicView>('Visão geral');
+  const [month, setMonth] = useState(() => monthKey(new Date()));
+  const [selectedDate, setSelectedDate] = useState(() => dayKey(new Date()));
+  const [selectedPatientId, setSelectedPatientId] = useState('');
+  const [appointmentDraft, setAppointmentDraft] = useState<AppointmentDraft | null>(null);
+  const [patientDraft, setPatientDraft] = useState<{ patient?: Patient } | null>(null);
+  const saveQueue = useRef<Promise<void>>(Promise.resolve());
+  const saveVersion = useRef(0);
+
   useEffect(() => {
-    let cancelled=false;
-    fetch('/api/auth',{cache:'no-store'}).then(response=>response.json()).then(auth=>{
-      if(cancelled)return;
-      if(!auth.configured){setAccessState('setup');setReady(true);return;}
-      setAccessState(auth.authenticated?'authenticated':'login');
-    }).catch(()=>{if(!cancelled){setAccessError('Não foi possível verificar o acesso. Confira sua conexão e tente novamente.');setAccessState('error');setReady(true);}});
-    return()=>{cancelled=true;};
-  },[]);
+    let cancelled = false;
+    fetch('/api/auth', { cache: 'no-store' }).then(response => response.json()).then(auth => {
+      if (cancelled) return;
+      if (!auth.configured) { setAccess('setup'); return; }
+      setAccess(auth.authenticated ? 'loading' : 'login');
+    }).catch(() => { if (!cancelled) { setAccessError('Não foi possível verificar o acesso. Confira sua conexão e tente novamente.'); setAccess('error'); } });
+    return () => { cancelled = true; };
+  }, []);
+
   useEffect(() => {
-    if(accessState!=='authenticated'||ready)return;
-    let cancelled=false;
-    (async()=>{
-      try{
-        const response=await fetch('/api/clinic',{cache:'no-store'});
-        if(!response.ok)throw new Error((await response.json()).error||'A conexão com a clínica falhou.');
-        const remote=(await response.json()).data as Partial<Store>|null;
-        let next=remote?cleanLocalStore(remote):cleanLocalStore(initial);
-        if(!remote){
-          try{const backup=localStorage.getItem(KEY);if(backup)next=cleanLocalStore(JSON.parse(backup) as Partial<Store>);}catch{}
-          for(const item of [...next.media]){
-            try{const blob=await readImageBlob(item.storageKey);if(!blob)continue;const form=new FormData();form.append('image',blob,`${item.storageKey}.image`);form.append('metadata',JSON.stringify(item));const uploaded=await fetch('/api/media',{method:'POST',body:form});if(!uploaded.ok)throw new Error('Uma fotografia antiga não pôde ser migrada.');const stored=await uploaded.json();next={...next,media:next.media.map(image=>image.id===item.id?{...image,storageKey:stored.id}:image)};}catch{next={...next,media:next.media.filter(image=>image.id!==item.id)};}
+    if (access !== 'loading') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch('/api/clinic', { cache: 'no-store' });
+        if (!response.ok) throw new Error((await response.json()).error || 'A conexão com a clínica falhou.');
+        const remote = (await response.json()).data as Partial<Store> | null;
+        let next = cleanLocalStore(remote || initial);
+        if (!remote) {
+          // Primeira abertura: migra o que estiver salvo neste navegador (versões antigas guardavam localmente).
+          try { const backup = localStorage.getItem(KEY); if (backup) next = cleanLocalStore(JSON.parse(backup) as Partial<Store>); } catch {}
+          for (const item of [...next.media]) {
+            try {
+              const blob = await readImageBlob(item.storageKey);
+              if (!blob) continue;
+              const form = new FormData();
+              form.append('image', blob, `${item.storageKey}.image`);
+              form.append('metadata', JSON.stringify(item));
+              const uploaded = await fetch('/api/media', { method: 'POST', body: form });
+              if (!uploaded.ok) throw new Error('Uma fotografia antiga não pôde ser migrada.');
+              const stored = await uploaded.json();
+              next = { ...next, media: next.media.map(image => image.id === item.id ? { ...image, storageKey: stored.id } : image) };
+            } catch {
+              next = { ...next, media: next.media.filter(image => image.id !== item.id) };
+            }
           }
-          const saved=await fetch('/api/clinic',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:next})});
-          if(!saved.ok)throw new Error((await saved.json()).error||'Não foi possível inicializar o armazenamento da clínica.');
+          const saved = await fetch('/api/clinic', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: next }) });
+          if (!saved.ok) throw new Error((await saved.json()).error || 'Não foi possível inicializar o armazenamento da clínica.');
         }
-        if(cancelled)return;
-        setData(next);localStorage.removeItem(KEY);setSyncStatus('saved');setSyncError('');setReady(true);
-      }catch(error){if(!cancelled){setSyncError(error instanceof Error?error.message:'Não foi possível carregar os dados da clínica.');setAccessState('error');setReady(true);}}
+        if (cancelled) return;
+        setData(next);
+        try { localStorage.removeItem(KEY); } catch {}
+        setReady(true);
+        setAccess('authenticated');
+      } catch (error) {
+        if (!cancelled) { setAccessError(error instanceof Error ? error.message : 'Não foi possível carregar os dados da clínica.'); setAccess('error'); }
+      }
     })();
-    return()=>{cancelled=true;};
-  },[accessState,ready]);
+    return () => { cancelled = true; };
+  }, [access]);
+
+  // Salva no servidor 500 ms depois da última alteração; só a versão mais recente atualiza o aviso de erro.
   useEffect(() => {
-    if(!ready||accessState!=='authenticated')return;
-    const version=++saveVersion.current;
-    setSyncStatus('saving');
-    const timer=setTimeout(()=>{
-      const snapshot=JSON.stringify(data);
-      saveQueue.current=saveQueue.current.catch(()=>{}).then(async()=>{
-        const response=await fetch('/api/clinic',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:JSON.parse(snapshot)})});
-        if(!response.ok)throw new Error((await response.json()).error||'Falha ao salvar no MongoDB.');
-        if(version===saveVersion.current){setSyncStatus('saved');setSyncError('');}
-      }).catch(error=>{if(version===saveVersion.current){setSyncStatus('error');setSyncError(error instanceof Error?error.message:'Falha ao salvar no MongoDB.');}});
-    },500);
-    return()=>clearTimeout(timer);
-  },[data,ready,accessState]);
-  useEffect(() => {if(ready)setMediaUrls(Object.fromEntries(data.media.map(item=>[item.id,`/api/media/${encodeURIComponent(item.storageKey)}`])));},[data.media,ready]);
-  const monthDate = new Date(`${month}-01T12:00:00`);
-  const calendarCells = useMemo(()=>{const [y,m]=month.split('-').map(Number);const first=new Date(y,m-1,1);const offset=(first.getDay()+6)%7;const count=new Date(y,m,0).getDate();const total=Math.ceil((offset+count)/7)*7;return Array.from({length:total},(_,i)=>new Date(y,m-1,i-offset+1));},[month]);
-  const costs = data.monthlyCosts[month] || { fixedCosts: 0, investments: 0 };
-  const monthAppointments = useMemo(() => data.appointments.filter(a => a.date.startsWith(month)).sort((a,b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`)), [data.appointments, month]);
-  const revenue = monthAppointments.filter(a => a.status === 'Realizada').reduce((n,a) => n + a.price, 0);
-  const scheduled = monthAppointments.filter(a => a.status === 'Agendada').length;
-  const profit = revenue - costs.fixedCosts - costs.investments;
-  const filteredPatients = data.patients.filter(p => p.name.toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR')) || p.phone.includes(query));
-  const patientName = (id: string) => data.patients.find(p => p.id === id)?.name || 'Paciente removido';
-  const patientNotes = data.notes.filter(n => n.patientId === selectedPatientId).sort((a,b) => b.date.localeCompare(a.date));
-  const patientProfile = data.profiles[selectedPatientId] || emptyProfile;
-  const patientMedia = data.media.filter(item=>item.patientId===selectedPatientId).sort((a,b)=>b.capturedAt.localeCompare(a.capturedAt));
-  const shiftMonth = (delta: number) => { const d = new Date(`${month}-01T12:00:00`); d.setMonth(d.getMonth() + delta); setMonth(monthKey(d)); };
-  const patchAppointment = (id: string, patch: Partial<Appointment>) => setData(d => ({ ...d, appointments: d.appointments.map(a => a.id === id ? { ...a, ...patch } : a) }));
-  function addPatient(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); const f = new FormData(e.currentTarget); const p: Patient = { id: makeId(), name: String(f.get('name')).trim(), phone: String(f.get('phone') || ''), email: String(f.get('email') || ''), since: String(f.get('since') || new Date().toISOString().slice(0,10)), notes: String(f.get('notes') || '') }; if (!p.name) return; setData(d => ({ ...d, patients: [p, ...d.patients] })); setPatientForm(false); }
-  const editingAppointment = data.appointments.find(a=>a.id===editingAppointmentId);
-  function openAppointmentForm(date=selectedAppointmentDate){setEditingAppointmentId('');setSelectedAppointmentDate(date);setAppointmentForm(true);}
-  function editAppointment(item:Appointment){setEditingAppointmentId(item.id);setSelectedAppointmentDate(item.date);setAppointmentForm(true);}
-  function addAppointment(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); const f = new FormData(e.currentTarget); const a: Appointment = { id: editingAppointmentId || makeId(), patientId: String(f.get('patientId')), date: String(f.get('date')), time: String(f.get('time')), type: String(f.get('type') || 'Consulta'), status: String(f.get('status')||'Agendada') as Appointment['status'], price: Math.max(0, Number(f.get('price')) || 0), notes: String(f.get('notes') || '') }; if(editingAppointmentId)setData(d=>({...d,appointments:d.appointments.map(item=>item.id===editingAppointmentId?a:item)}));else setData(d => ({ ...d, appointments: [...d.appointments, a] })); setAppointmentForm(false); setEditingAppointmentId(''); }
-  const editingNote = data.notes.find(note=>note.id===editingNoteId);
-  function openNoteForm(note?:ClinicalNote,appointmentId=''){setEditingNoteId(note?.id||'');setActiveAppointmentId(note?.appointmentId||appointmentId);setNoteForm(true);}
-  function addClinicalNote(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); const f = new FormData(e.currentTarget); const fields = ['reason','report','exam','pullTest','assessment','differential','plan','followUp','trichoDevice','magnification','frontal','vertex','temporalRight','temporalLeft','parietal','occipital','trichoMetrics','photoReference','tests'] as const; const values = Object.fromEntries(fields.map(k => [k, String(f.get(k) || '')])) as Pick<ClinicalNote, typeof fields[number]>; const n: ClinicalNote = { id: editingNoteId || makeId(), patientId: selectedPatientId, appointmentId: String(f.get('appointmentId') || ''), date: String(f.get('date')), selectedFindings: f.getAll('selectedFindings').map(String), ...values }; setData(d => ({ ...d, notes: editingNoteId ? d.notes.map(item=>item.id===editingNoteId?n:item) : [n, ...d.notes] })); setNoteForm(false); setEditingNoteId(''); }
-  function saveProfile(e: React.FormEvent<HTMLFormElement>) { e.preventDefault(); const f = new FormData(e.currentTarget); const profile = Object.fromEntries(profileFields.map(([key]) => [key, String(f.get(key) || '')])) as PatientProfile; setData(d => ({ ...d, profiles: { ...d.profiles, [selectedPatientId]: profile } })); setProfileForm(false); }
-  async function addMedia(e:React.FormEvent<HTMLFormElement>){e.preventDefault();const f=new FormData(e.currentTarget);const file=f.get('image');if(!(file instanceof File)||!file.size)return;if(file.size>12*1024*1024){window.alert('Escolha uma imagem de até 12 MB.');return;}const id=makeId();const item:MediaAttachment={id,patientId:selectedPatientId,appointmentId:String(f.get('appointmentId')||''),kind:String(f.get('kind')) as MediaAttachment['kind'],caption:String(f.get('caption')||''),capturedAt:String(f.get('capturedAt')||new Date().toISOString().slice(0,10)),mimeType:file.type,sizeBytes:file.size,storageKey:id,createdAt:new Date().toISOString()};try{const form=new FormData();form.append('image',file,file.name);form.append('metadata',JSON.stringify(item));const response=await fetch('/api/media',{method:'POST',body:form});if(!response.ok)throw new Error((await response.json()).error||'Falha ao enviar a imagem.');const stored=await response.json();setData(d=>({...d,media:[{...item,storageKey:stored.id},...d.media]}));setMediaForm(false);}catch(error){window.alert(error instanceof Error?error.message:'Não foi possível salvar a imagem no MongoDB.');}}
-  async function removeMedia(item:MediaAttachment){try{const response=await fetch('/api/media/'+encodeURIComponent(item.storageKey),{method:'DELETE'});if(!response.ok)throw new Error('Não foi possível excluir a imagem.');setData(d=>({...d,media:d.media.filter(media=>media.id!==item.id)}));}catch(error){window.alert(error instanceof Error?error.message:'Não foi possível remover a imagem.');}}
-  function appendSetting(key:'appointmentTypes'|'trichoscopyFindings',value:string){const clean=value.trim();if(!clean)return;setData(d=>({...d,settings:{...d.settings,[key]:d.settings[key].includes(clean)?d.settings[key]:[...d.settings[key],clean]}}));}
-  function removeSetting(key:'appointmentTypes'|'trichoscopyFindings',value:string){setData(d=>({...d,settings:{...d.settings,[key]:d.settings[key].filter(item=>item!==value)}}));}
-  async function submitAccess(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setAccessError('');setAccessSubmitting(true);try{const response=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:accessUsername,password:accessPassword})});const result=await response.json();if(!response.ok)throw new Error(result.error||'Não foi possível entrar.');setAccessPassword('');setAccessState('authenticated');}catch(error){setAccessError(error instanceof Error?error.message:'Não foi possível entrar.');}finally{setAccessSubmitting(false);}}
-  if(accessState!=='authenticated'||!ready){const busy=accessState==='checking'||(accessState==='authenticated'&&!ready);return <main className="accessShell" aria-busy={busy}>
-    <aside className="accessAside">
-      <div className="accessBrand"><img src="/zaindu-mark.svg" alt=""/><span>ZAINDU</span></div>
-      <figure className="accessEntry">
-        <p className="accessWord">zaindu</p>
-        <figcaption>do basco: cuidar, proteger, guardar.</figcaption>
-      </figure>
-      <p className="accessFoot">Agenda, pacientes e prontuários da sua clínica, num só lugar.</p>
-    </aside>
-    <section className="accessPanel">
-      <div className="accessBody">
-        {busy?<><h1>Abrindo sua clínica</h1><p className="accessLead">Carregando pacientes, agenda e prontuários.</p><span className="accessLoader" aria-hidden="true"/></>
-        :accessState==='setup'?<><h1>Login ainda não configurado</h1><p className="accessLead">Defina <code>NEXT_PUBLIC_SUPABASE_URL</code> e <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> no ambiente local e na Vercel e publique de novo.</p></>
-        :accessState==='error'?<><h1>Não foi possível abrir a clínica</h1><p className="accessLead">{syncError||accessError}</p><button className="button primary accessSubmit" onClick={()=>window.location.reload()}>Tentar de novo</button></>
-        :<><h1>Entrar na clínica</h1><p className="accessLead">Use o usuário e a senha cadastrados para você.</p>
-          <form className="accessForm" onSubmit={submitAccess}>
-            <label>Usuário ou e-mail<input type="text" autoFocus autoComplete="username" autoCapitalize="none" spellCheck={false} value={accessUsername} onChange={e=>setAccessUsername(e.target.value)} required aria-invalid={Boolean(accessError)}/></label>
-            <label>Senha<span className="passwordField"><input type={showAccessPassword?"text":"password"} autoComplete="current-password" value={accessPassword} onChange={e=>setAccessPassword(e.target.value)} required aria-invalid={Boolean(accessError)}/><button type="button" className="passwordToggle" onClick={()=>setShowAccessPassword(show=>!show)} aria-label={showAccessPassword?"Ocultar senha":"Mostrar senha"} aria-pressed={showAccessPassword} title={showAccessPassword?"Ocultar senha":"Mostrar senha"}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">{showAccessPassword?<><path d="M10.58 10.58a2 2 0 0 0 2.83 2.83"/><path d="M16.68 16.68A10.94 10.94 0 0 1 12 18c-5 0-9-6-9-6a18.5 18.5 0 0 1 4.11-4.68"/><path d="M20.94 12a18.5 18.5 0 0 0-4.23-4.68A10.94 10.94 0 0 0 12 6c-1.08 0-2.1.2-3.05.55"/><path d="m2 2 20 20"/></>:<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></>}</svg></button></span></label>
-            {accessError&&<p className="accessError" role="alert">{accessError}</p>}
-            <button className="button primary accessSubmit" disabled={accessSubmitting}>{accessSubmitting?'Entrando…':'Entrar'}</button>
-          </form></>}
-      </div>
-    </section>
-  </main>;}
-return <main className={`shell ${sidebarCollapsed?'sidebarCollapsed':''} ${mobileNavOpen?'mobileNavOpen':''}`}>
-    <aside className="sidebar" id="clinic-sidebar"><button className="collapseButton" onClick={()=>setSidebarCollapsed(!sidebarCollapsed)} aria-label={sidebarCollapsed?'Expandir menu':'Recolher menu'}>{sidebarCollapsed?'→':'←'}</button><div className="brand"><img className="brandMark" src="/zaindu-mark.svg" alt=""/><div><strong>ZAINDU</strong><small>GESTÃO CLÍNICA</small></div></div><div className="workspace"><span className="avatar">{data.settings.professionalName.slice(0,1).toUpperCase()}</span><div><strong>{data.settings.professionalName}</strong><small>{data.settings.specialty}</small></div></div><div className="navLabel">ESPAÇO DA CLÍNICA</div><nav className="sideNav" aria-label="Navegação principal">{(['Visão geral','Agenda','Pacientes','Prontuário','Financeiro','Todos os dias','Configurações'] as const).map((item,i)=><button key={item} onClick={()=>{setView(item);setMobileNavOpen(false);}} className={`navItem ${view===item?'selected':''}`}><span className="navIcon">{['◫','▦','♙','▤','◉','✦','⚙'][i]}</span>{item}{item==='Agenda'&&<span className="navCount">{scheduled}</span>}</button>)}</nav><div className="sideTip"><span>✳</span><b>Um cuidado por vez.</b><p>Organize a rotina e acompanhe a jornada de cada paciente.</p></div><div className="sidebarFoot"><span className={`statusDot ${syncStatus==='error'?'syncErrorDot':''}`}/>{syncStatus==='saving'?'Salvando na nuvem…':syncStatus==='error'?'Falha ao sincronizar':'Sincronizado no MongoDB'}</div></aside>
-    {mobileNavOpen&&<button className="mobileNavBackdrop" aria-label="Fechar menu" onClick={()=>setMobileNavOpen(false)}/>}
-    <section className="mainArea"><header className="topbar"><button className="mobileMenu" onClick={()=>setMobileNavOpen(true)} aria-label="Abrir menu" aria-expanded={mobileNavOpen} aria-controls="clinic-sidebar">☰</button><div className="crumb">{data.settings.clinicName} <span>/</span> {view}</div><div className="topActions"><span className="topAvatar">{data.settings.professionalName.slice(0,1).toUpperCase()}</span></div></header><div className={`content view-${view==='Visão geral'?'home':view==='Financeiro'?'finance':view==='Agenda'?'agenda':view==='Prontuário'?'record':view==='Configurações'?'settings':view==='Todos os dias'?'daily':'patients'}`}>
-      <div className="pageHeading"><div><p className="eyebrow">{data.settings.professionalName.toUpperCase()} · {data.settings.specialty.toUpperCase()}</p><h1>{view==='Visão geral'?'Sua clínica, em equilíbrio':view}</h1><p className="subheading">{view==='Visão geral'?'Acompanhe o mês e cuide de cada etapa da jornada.':view==='Agenda'?'Calendário mensal de consultas e retornos.':view==='Pacientes'?'Cadastro de pacientes.':view==='Prontuário'?'Histórico, consultas e evoluções de cada paciente.':view==='Financeiro'?'Receitas, custos e resultado do mês.':'Personalize a clínica e os registros de atendimento.'}</p>{!['Pacientes','Todos os dias'].includes(view)&&<span className="month-pill">{monthName(monthDate)}</span>}</div>{!['Pacientes','Todos os dias'].includes(view)&&<div className="heroActions"><div className="monthControls"><button onClick={() => shiftMonth(-1)} aria-label="Mês anterior">‹</button><button className="todayButton" onClick={() => setMonth(monthKey(new Date()))}>Hoje</button><button onClick={() => shiftMonth(1)} aria-label="Próximo mês">›</button><input type="month" value={month} onChange={e => setMonth(e.target.value)} aria-label="Selecionar mês" /></div><button className="button primary" onClick={() => openAppointmentForm(`${month}-01`)}><span>＋</span> Nova consulta</button></div>}</div>
-      {view==='Visão geral' && <div className="intro spanAll"><b>{monthName(monthDate)}:</b> acompanhe seus atendimentos, organize os pacientes e atualize os números da clínica ao longo do mês.</div>}
-      {(view==='Visão geral'||view==='Financeiro') && <div className="metricGrid"><Metric title="Consultas no mês" value={String(monthAppointments.length).padStart(2,'0')} note={`${scheduled} aguardando atendimento`} icon="▦"/><Metric title="Pacientes ativos" value={String(data.patients.length).padStart(2,'0')} note="Na sua base de pacientes" icon="♙"/><Metric title="Receita realizada" value={brl(revenue)} note="Consultas concluídas" icon="↗" tone="positive"/><Metric title="Resultado estimado" value={brl(profit)} note="Receita − custos cadastrados" icon="◉" tone={profit>=0?'positive':'negative'}/></div>}
-      {view==='Visão geral' && <section className="panel appointmentsPanel"><div className="panelHeader"><div><h2>Próximos atendimentos</h2><p>Agenda de {monthName(monthDate)}.</p></div><button className="textButton" onClick={() => setView('Agenda')}>Abrir calendário <span>→</span></button></div><div className="upcomingList">{monthAppointments.length ? monthAppointments.slice(0,5).map(a=><article className="upcomingItem" key={a.id}><div className="upcomingDate"><b>{new Date(a.date+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit'})}</b><small>{new Date(a.date+'T12:00:00').toLocaleDateString('pt-BR',{month:'short'})} · {a.time}</small></div><div className="upcomingPatient"><strong>{patientName(a.patientId)}</strong><small>{a.type}</small></div><span className={'appointmentStatus status-'+a.status.toLowerCase()}>{a.status}</span><button className="textButton" onClick={()=>editAppointment(a)}>Abrir</button></article>) : <div className="empty">Nenhum atendimento neste mês. Agendamentos aparecerão aqui e no calendário.</div>}</div></section>}
-      {view==='Visão geral' && <section className="dailyHighlight"><div><span className="dailyEyebrow">UMA PALAVRA PARA HOJE</span><h2>{verseForToday().reference}</h2><b>{verseForToday().theme}</b><p>{verseForToday().reflection}</p></div><button className="textButton" onClick={()=>setView('Todos os dias')}>Ver mensagem <span>→</span></button></section>}
-      {view==='Agenda' && <section className="panel calendarPanel"><div className="panelHeader"><div><h2>Calendário mensal</h2><p>Selecione um horário livre para agendar; toque em um atendimento para editar.</p></div><button className="button outline" onClick={()=>openAppointmentForm(`${month}-${String(new Date().getDate()).padStart(2,'0')}`)}>＋ Nova consulta</button></div><div className="calendarWeekdays">{['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map(day=><div key={day}>{day}</div>)}</div><div className="calendarGrid">{calendarCells.map(day=>{const key=dayKey(day);const inMonth=monthKey(day)===month;const entries=data.appointments.filter(a=>a.date===key).sort((a,b)=>a.time.localeCompare(b.time));const today=key===dayKey(new Date());return <div key={key} className={`calendarDay ${inMonth?'':'outsideMonth'} ${today?'today':''}`}><div className="calendarDayHead"><span>{day.getDate()}</span><button onClick={()=>openAppointmentForm(key)} aria-label={`Agendar em ${key}`}>＋</button></div><div className="calendarEvents">{entries.slice(0,3).map(a=><button key={a.id} className={`calendarEvent ${a.status==='Realizada'?'done':a.status==='Cancelada'?'cancelled':''}`} onClick={()=>editAppointment(a)} title={`${a.time} · ${patientName(a.patientId)} · ${a.type}`}><b>{a.time}</b> {patientName(a.patientId).split(' ')[0]}</button>)}{entries.length>3&&<small>+{entries.length-3} mais</small>}</div></div>})}</div><div className="calendarLegend"><span><i className="legendScheduled"/> Agendada</span><span><i className="legendDone"/> Realizada</span><span><i className="legendCancelled"/> Cancelada</span></div></section>}
-      {view==='Pacientes' && <section className="panel patientsPanel"><div className="panelHeader"><div><h2>Cadastro de pacientes</h2><p>Cadastre e localize pacientes.</p></div><button className="button outline" onClick={()=>setPatientForm(true)}>＋ Adicionar paciente</button></div><div className="patientTools"><label className="search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar paciente"/></label></div><div className="patientList">{filteredPatients.length ? filteredPatients.slice(0,100).map((p,i)=><div className="patientRow" key={p.id}><span className={`patientAvatar tone${i%4}`}>{p.name.slice(0,1).toUpperCase()}</span><div className="patientInfo"><strong>{p.name}</strong><small>{p.phone || 'Telefone não cadastrado'}{p.email?` · ${p.email}`:''}</small></div><div className="patientSince">Desde {new Date(`${p.since}T12:00:00`).toLocaleDateString('pt-BR')}</div><button className="textButton recordLink" onClick={()=>{setSelectedPatientId(p.id);setView('Prontuário');}}>Prontuário →</button><button className="moreButton" aria-label={`Remover ${p.name}`} onClick={()=>{setData(d=>({...d,patients:d.patients.filter(x=>x.id!==p.id)}));}}>···</button></div>) : <div className="empty">Nenhum paciente encontrado.</div>}</div></section>}
-      {view==='Financeiro' && <section className="panel financePanel"><div className="panelHeader"><div><h2>Resumo financeiro</h2><p>Baseado nas consultas marcadas como realizadas.</p></div></div><div className="financeForm"><label>Custos fixos do mês <input type="number" min="0" step="0.01" value={costs.fixedCosts} onChange={e=>setData(d=>({...d,monthlyCosts:{...d.monthlyCosts,[month]:{...costs,fixedCosts:Math.max(0,Number(e.target.value))}}}))}/></label><label>Parcelas e investimentos <input type="number" min="0" step="0.01" value={costs.investments} onChange={e=>setData(d=>({...d,monthlyCosts:{...d.monthlyCosts,[month]:{...costs,investments:Math.max(0,Number(e.target.value))}}}))}/></label></div><div className="financeResult"><span>Resultado estimado</span><strong className={profit>=0?'positiveMoney':'negativeMoney'}>{brl(profit)}</strong></div><p className="hint">Ajuste cada valor aos seus fornecedores e ao protocolo autorizado. O custo do conhecimento profissional começa em R$ 30 por paciente e pode ser alterado.</p>
-        <div className="costSection"><div className="panelHeader"><div><h2>Custos por atendimento</h2><p>Estimativa configurável de materiais, EPIs, equipamentos e conhecimento.</p></div></div><label className="knowledgeInput">Conhecimento profissional por paciente (R$)<input type="number" min="0" step="0.01" value={data.knowledgeCost} onChange={e=>setData(d=>({...d,knowledgeCost:Math.max(0,Number(e.target.value))}))}/></label>
-        {['MMP capilar','PRP capilar','LEDterapia','Consulta de tricologia'].map(service=>{const terms=service==='MMP capilar'?['MMP','mescla','EPI','Biossegurança']:service==='PRP capilar'?['PRP','EPI','Biossegurança']:service==='LEDterapia'?['Equipamentos','EPI']:['EPI','Biossegurança'];const items=data.supplies.filter(i=>terms.some(t=>i.category.includes(t)));const total=items.reduce((sum,i)=>sum+i.unitCost*i.defaultQty,0)+data.knowledgeCost;return <article className="serviceCost" key={service}><div className="panelHeader"><div><h3>{service}</h3><p>{items.length} itens estimados por sessão</p></div><strong>{brl(total)}</strong></div><p className="suggestedPrice">Preço sugerido com margem alvo: <b>{brl(total*(1+data.targetMargin/100))}</b></p><div className="costChips">{items.map(i=><span key={i.id}>{i.name} · {brl(i.unitCost*i.defaultQty)}</span>)}<span>Conhecimento · {brl(data.knowledgeCost)}</span></div></article>})}</div>
-        <div className="costSection"><div className="panelHeader"><div><h2>Materiais e custos unitários</h2><p>Inclua luvas, insumos, descartáveis e rateio de equipamentos.</p></div></div><form className="supplyForm" onSubmit={e=>{e.preventDefault();if(!supplyDraft.name.trim())return;setData(d=>({...d,supplies:[...d.supplies,{id:makeId(),...supplyDraft,unitCost:Number(supplyDraft.unitCost)||0,defaultQty:Number(supplyDraft.defaultQty)||1}]}));setSupplyDraft({name:'',category:'Personalizado',unit:'unidade',unitCost:'',defaultQty:'1'});}}><input aria-label="Nome do insumo" placeholder="Ex.: luvas, seringa, ponteira" value={supplyDraft.name} onChange={e=>setSupplyDraft({...supplyDraft,name:e.target.value})}/><input aria-label="Categoria" placeholder="Categoria" value={supplyDraft.category} onChange={e=>setSupplyDraft({...supplyDraft,category:e.target.value})}/><input aria-label="Unidade" placeholder="Unidade" value={supplyDraft.unit} onChange={e=>setSupplyDraft({...supplyDraft,unit:e.target.value})}/><input aria-label="Custo unitário" type="number" min="0" step="0.01" placeholder="Custo R$" value={supplyDraft.unitCost} onChange={e=>setSupplyDraft({...supplyDraft,unitCost:e.target.value})}/><input aria-label="Quantidade por sessão" type="number" min="0" step="0.1" placeholder="Qtd/sessão" value={supplyDraft.defaultQty} onChange={e=>setSupplyDraft({...supplyDraft,defaultQty:e.target.value})}/><button className="button outline">Adicionar insumo</button></form><div className="supplyList">{data.supplies.map(item=><div className="supplyRow" key={item.id}><span><b>{item.name}</b><small>{item.category} · {item.unit}</small></span><label>R$ <input type="number" min="0" step="0.01" value={item.unitCost} onChange={e=>setData(d=>({...d,supplies:d.supplies.map(x=>x.id===item.id?{...x,unitCost:Number(e.target.value)||0}:x)}))}/></label><label>Qtd/sessão <input type="number" min="0" step="0.1" value={item.defaultQty} onChange={e=>setData(d=>({...d,supplies:d.supplies.map(x=>x.id===item.id?{...x,defaultQty:Number(e.target.value)||0}:x)}))}/></label><button className="moreButton" aria-label={`Remover ${item.name}`} onClick={()=>setData(d=>({...d,supplies:d.supplies.filter(x=>x.id!==item.id)}))}>×</button></div>)}</div></div>
-        <div className="sourceNote">Referências para composição inicial: revisões de PRP descrevem tubos/kit, centrífuga e aplicação com seringa e agulhas; estudos de microagulhamento descrevem cartuchos/dispositivos; a fotobiomodulação depende de equipamento e rateio por sessão. A lista é um modelo de custeio, não um protocolo clínico. Confira materiais, indicação e regras profissionais aplicáveis antes de usar.</div></section>}
-      {view==='Todos os dias' && <section className="panel dailyPanel"><div className="dailyLead"><span className="dailyEyebrow">UMA PALAVRA PARA HOJE · {new Intl.DateTimeFormat('pt-BR',{day:'numeric',month:'long',year:'numeric'}).format(new Date())}</span><h2>{verseForToday().reference}</h2><b>{verseForToday().theme}</b><p>{verseForToday().reflection}</p><small>Uma mensagem bíblica por dia. Amanhã, uma nova leitura estará esperando por você.</small></div><p className="dailyFooter">Que essa palavra acompanhe seu dia e seu trabalho.</p></section>}
-      {view==='Configurações' && <section className="panel settingsPanel"><div className="panelHeader"><div><h2>Personalizar esta clínica</h2><p>Identidade profissional e listas configuráveis para cada especialidade.</p></div></div><div className="clinicIdentityForm"><label>Nome da clínica<input value={data.settings.clinicName} onChange={e=>setData(d=>({...d,settings:{...d.settings,clinicName:e.target.value}}))}/></label><label>Profissional responsável<input value={data.settings.professionalName} onChange={e=>setData(d=>({...d,settings:{...d.settings,professionalName:e.target.value}}))}/></label><label>Especialidade<input value={data.settings.specialty} onChange={e=>setData(d=>({...d,settings:{...d.settings,specialty:e.target.value}}))}/></label></div><div className="settingsGrid"><SettingsList title="Tipos de atendimento" values={data.settings.appointmentTypes} value={newAppointmentType} setValue={setNewAppointmentType} add={()=>{appendSetting('appointmentTypes',newAppointmentType);setNewAppointmentType('');}} remove={value=>removeSetting('appointmentTypes',value)}/><SettingsList title="Checklist clínico" values={data.settings.trichoscopyFindings} value={newTrichoFinding} setValue={setNewTrichoFinding} add={()=>{appendSetting('trichoscopyFindings',newTrichoFinding);setNewTrichoFinding('');}} remove={value=>removeSetting('trichoscopyFindings',value)}/></div><p className="hint">As evoluções clínicas ficam ligadas a uma consulta e ao prontuário da pessoa atendida. Preferências de comunicação ajudam a equipe a adaptar a conversa, sem rotular a personalidade do paciente.</p></section>}
-      {view==='Prontuário' && <section className="panel recordPanel">
-        <div className="panelHeader"><div><h2>Prontuário eletrônico</h2><p>Histórico capilar, saúde geral, consultas e evolução.</p></div><button className="button primary" onClick={()=>openNoteForm()} disabled={!selectedPatientId}>＋ Nova anotação</button></div>
-        {data.patients.length ? <label className="recordSelect">Paciente<select value={selectedPatientId} onChange={e=>setSelectedPatientId(e.target.value)}><option value="">Selecione uma paciente</option>{data.patients.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label> : <div className="empty">Cadastre uma paciente antes de criar o prontuário.</div>}
-        {selectedPatientId && <>
-          <div className="recordSummary">{patientMedia.find(item=>item.kind==='patient'&&mediaUrls[item.id])?<img className="recordPortrait" src={mediaUrls[patientMedia.find(item=>item.kind==='patient'&&mediaUrls[item.id])!.id]} alt={`Foto de ${patientName(selectedPatientId)}`}/>:<span className="patientAvatar">{patientName(selectedPatientId).slice(0,1).toUpperCase()}</span>}<div><strong>{patientName(selectedPatientId)}</strong><small>{data.appointments.filter(a=>a.patientId===selectedPatientId).length} atendimento(s) · {patientNotes.length} anotação(ões) · {patientMedia.length} imagem(ns)</small></div></div>
-          <div className="clinicalAlerts"><div><strong>Alergias / intolerâncias</strong><span>{patientProfile.allergies || 'Não informado — confirmar com a paciente'}</span></div><div><strong>Comorbidades</strong><span>{patientProfile.comorbidities || 'Não informado'}</span></div><div><strong>Medicamentos em uso</strong><span>{patientProfile.medications || 'Não informado'}</span></div><div><strong>Como prefere conversar</strong><span>{patientProfile.communicationStyle||'Ainda não informado'}</span></div></div>
-          <section className="profileCard mediaCard"><div className="profileHeader"><div><h3>Fotografias clínicas</h3><p>Fotos de referência e comparativos antes/depois, associados à data e ao atendimento.</p></div><button className="button outline" onClick={()=>setMediaForm(true)}>＋ Anexar imagem</button></div>{patientMedia.length?<div className="mediaGrid">{patientMedia.map(item=><article className="mediaItem" key={item.id}>{mediaUrls[item.id]?<img src={mediaUrls[item.id]} alt={item.caption||`Imagem ${item.kind}`} />:<div className="mediaPlaceholder">Imagem carregando…</div>}<div className="mediaMeta"><span className={`mediaKind kind-${item.kind}`}>{({patient:'Paciente',before:'Antes',after:'Depois',trichoscopy:'Tricoscopia'} as const)[item.kind]}</span><b>{item.caption||'Sem legenda'}</b><small>{new Date(`${item.capturedAt}T12:00:00`).toLocaleDateString('pt-BR')}{item.appointmentId?` · ${data.appointments.find(a=>a.id===item.appointmentId)?.type||'Atendimento'}`:''}</small></div><button className="textButton" onClick={()=>removeMedia(item)}>Remover</button></article>)}</div>:<div className="empty noteEmpty">Nenhuma imagem anexada.</div>}</section>
-          <section className="profileCard"><div className="profileHeader"><div><h3>Anamnese e histórico de saúde/cabelos</h3><p>Informações da paciente, editáveis ao longo do acompanhamento.</p></div><button className="button outline" onClick={()=>setProfileForm(true)}>Editar anamnese</button></div><div className="profileGrid">{profileFields.filter(([key])=>Boolean(patientProfile[key])).map(([key,label])=><NoteField key={key} label={label} value={patientProfile[key]}/>)}{profileFields.every(([key])=>!patientProfile[key])&&<p className="empty">Anamnese ainda não preenchida. Use “Editar anamnese” para registrar o histórico.</p>}</div></section>
-          <h3 className="notesHeading">Consultas, retornos e evolução</h3><div className="appointmentTimeline">{data.appointments.filter(a=>a.patientId===selectedPatientId).sort((a,b)=>b.date.localeCompare(a.date)||b.time.localeCompare(a.time)).map(a=><article key={a.id}><b>{new Date(`${a.date}T12:00:00`).toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}</b><span>{a.type} · {a.time} · {a.status}</span><small>{patientNotes.filter(n=>n.appointmentId===a.id).map(n=>n.report||n.assessment||n.reason).filter(Boolean).join(' · ')||'Retorno sem evolução registrada'}</small><button className="textButton" onClick={()=>openNoteForm(patientNotes.find(n=>n.appointmentId===a.id),a.id)}>{patientNotes.some(n=>n.appointmentId===a.id)?'Abrir evolução':'Registrar evolução'}</button></article>)}</div>
-          {patientNotes.length ? <div className="noteList">{patientNotes.map(n=><article className="clinicalNote" key={n.id}><header><div><strong>{new Date(`${n.date}T12:00:00`).toLocaleDateString('pt-BR',{day:'2-digit',month:'long',year:'numeric'})}</strong><small>{n.appointmentId ? data.appointments.find(a=>a.id===n.appointmentId)?.type || 'Atendimento' : 'Anotação geral'}{n.appointmentId ? ` · ${data.appointments.find(a=>a.id===n.appointmentId)?.time || ''}` : ''}</small></div><button className="textButton" onClick={()=>openNoteForm(n)}>Editar anotação</button></header>{noteGroups.map(group=>{const fields=group.fields.filter(([key])=>Boolean(n[key]));return fields.length ? <section className="clinicalGroup" key={group.title}><h4>{group.title}</h4>{fields.map(([key,label])=><NoteField key={key} label={label} value={n[key]}/>)}</section> : null})}{n.selectedFindings?.length>0&&<div className="savedChecks"><strong>Checklist:</strong> {n.selectedFindings.join(" · ")}</div>}</article>)}</div> : <div className="empty noteEmpty">Nenhuma evolução ou anotação registrada para esta paciente.</div>}
-        </>}
-        <p className="privacyNote">Consultas, dados do paciente e evoluções são sincronizados com o banco da clínica. Fotografias ficam em armazenamento GridFS privado e são vinculadas ao paciente e à consulta escolhida.</p>
-      </section>}
-      <div className="bottomCards"><div className="miniCard"><span className="miniIcon sage">✳</span><div><b>Acompanhamento contínuo</b><p>Consultas e evoluções mantêm a linha do cuidado reunida no prontuário.</p></div></div><div className="miniCard"><span className="miniIcon sand">⌁</span><div><b>{syncStatus==='saving'?'Sincronizando alterações':syncStatus==='error'?'Falha na sincronização':'Dados sincronizados'}</b><p>{syncError||'Agenda, prontuário e cadastros ficam disponíveis entre seus dispositivos autorizados.'}</p></div></div></div>
-      <footer>ZAINDU <span>·</span> Gestão clínica <span>·</span> {monthName(month)}</footer>
-    </div></section>
-    {patientForm && <Modal title="Adicionar paciente" close={()=>setPatientForm(false)}><form onSubmit={addPatient} className="modalForm"><label>Nome completo *<input name="name" required autoFocus placeholder="Nome da paciente"/></label><label>Telefone<input name="phone" type="tel" placeholder="(00) 00000-0000"/></label><label>E-mail<input name="email" type="email" placeholder="email@exemplo.com"/></label><label>Data de cadastro<input name="since" type="date" defaultValue={new Date().toISOString().slice(0,10)}/></label><label className="full">Observações<input name="notes" placeholder="Informações administrativas"/></label><div className="modalActions"><button type="button" className="button outline" onClick={()=>setPatientForm(false)}>Cancelar</button><button className="button primary">Salvar paciente</button></div></form></Modal>}
-    {appointmentForm && <Modal title={editingAppointment?'Editar consulta':'Nova consulta'} close={()=>{setAppointmentForm(false);setEditingAppointmentId('');}}><form key={editingAppointmentId||'new-appointment'} onSubmit={addAppointment} className="modalForm"><label>Paciente *<select name="patientId" required defaultValue={editingAppointment?.patientId||''}><option value="" disabled>Selecione uma paciente</option>{data.patients.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>Tipo de atendimento<select name="type" defaultValue={editingAppointment?.type||data.settings.appointmentTypes[0]}>{data.settings.appointmentTypes.map(type=><option key={type}>{type}</option>)}{editingAppointment&&!data.settings.appointmentTypes.includes(editingAppointment.type)&&<option>{editingAppointment.type}</option>}</select></label><label>Data *<input name="date" type="date" required defaultValue={editingAppointment?.date||selectedAppointmentDate}/></label><label>Horário *<input name="time" type="time" required defaultValue={editingAppointment?.time||'09:00'}/></label><label>Valor (R$)<input name="price" type="number" min="0" step="0.01" defaultValue={editingAppointment?.price||0}/></label><label>Status<select name="status" defaultValue={editingAppointment?.status||'Agendada'}><option>Agendada</option><option>Realizada</option><option>Cancelada</option></select></label><label className="full">Observações<input name="notes" defaultValue={editingAppointment?.notes||''} placeholder="Opcional"/></label><div className="modalActions"><button type="button" className="button outline" onClick={()=>{setAppointmentForm(false);setEditingAppointmentId('');}}>Cancelar</button><button className="button primary">{editingAppointment?'Salvar alterações':'Agendar consulta'}</button></div></form></Modal>}
-    {noteForm && <Modal title={editingNote?'Editar evolução / exame':'Nova evolução / exame'} close={()=>{setNoteForm(false);setEditingNoteId('');setActiveAppointmentId('');}}><form key={editingNoteId||'new-note'} onSubmit={addClinicalNote} className="noteForm"><div className="noteContext"><strong>{patientName(selectedPatientId)}</strong><span>Anotação vinculada ao prontuário; associe a um atendimento quando aplicável.</span></div><div className="noteMeta"><label>Data<input name="date" type="date" required defaultValue={editingNote?.date||new Date().toISOString().slice(0,10)}/></label><label>Atendimento<select name="appointmentId" defaultValue={editingNote?.appointmentId||activeAppointmentId}><option value="">Anotação geral</option>{data.appointments.filter(a=>a.patientId===selectedPatientId).map(a=><option key={a.id} value={a.id}>{new Date(`${a.date}T12:00:00`).toLocaleDateString('pt-BR')} · {a.type}</option>)}</select></label></div>{noteGroups.map(group=><fieldset className="noteGroup" key={group.title}><legend>{group.title}</legend><div className="noteGroupFields">{group.fields.map(([key,label,placeholder])=><label key={key}>{label}<textarea name={key} rows={key==='trichoMetrics'||key==='exam'?4:2} placeholder={placeholder} defaultValue={editingNote?.[key]||''}/></label>)}</div></fieldset>)}<fieldset className="noteGroup"><legend>Checklist de achados</legend><div className="checkGrid">{data.settings.trichoscopyFindings.map(item=><label key={item}><input type="checkbox" name="selectedFindings" value={item} defaultChecked={editingNote?.selectedFindings?.includes(item)}/>{item}</label>)}</div></fieldset><div className="modalActions"><button type="button" className="button outline" onClick={()=>{setNoteForm(false);setEditingNoteId('');setActiveAppointmentId('');}}>Cancelar</button><button className="button primary">{editingNote?'Salvar alterações':'Salvar anotação'}</button></div></form></Modal>}
-    {profileForm && <Modal title="Anamnese e preferências de atendimento" close={()=>setProfileForm(false)}><form onSubmit={saveProfile} className="profileForm"><p className="formIntro">Registre o que for pertinente à avaliação, com contexto e consentimento. A preferência de comunicação é opcional e serve para ajustar a conversa ao que deixa cada pessoa mais confortável.</p><div className="profileFormGrid">{profileFields.map(([key,label,kind])=><label key={key}>{label}{kind==='date'?<input name={key} type="date" defaultValue={patientProfile[key]}/>:kind==='textarea'?<textarea name={key} rows={2} defaultValue={patientProfile[key]} placeholder="Registrar informação, período e contexto"/>:kind==='select'?<select name={key} defaultValue={patientProfile[key]}><option value="">Não informado</option>{communicationStyles.map(style=><option key={style}>{style}</option>)}</select>:<input name={key} type="text" defaultValue={patientProfile[key]}/>}</label>)}</div><div className="modalActions"><button type="button" className="button outline" onClick={()=>setProfileForm(false)}>Cancelar</button><button className="button primary">Salvar anamnese</button></div></form></Modal>}
-    {mediaForm && <Modal title="Anexar fotografia clínica" close={()=>setMediaForm(false)}><form className="mediaForm" onSubmit={addMedia}><p className="formIntro">A imagem será enviada ao armazenamento GridFS do MongoDB e associada ao prontuário, com data e consulta opcional.</p><label>Imagem *<input type="file" name="image" accept="image/*" required/></label><div className="noteMeta"><label>Categoria<select name="kind" defaultValue="trichoscopy"><option value="patient">Foto da paciente</option><option value="before">Antes</option><option value="after">Depois</option><option value="trichoscopy">Tricoscopia</option></select></label><label>Data da imagem<input name="capturedAt" type="date" defaultValue={new Date().toISOString().slice(0,10)}/></label></div><label>Legenda/localização<textarea name="caption" rows={2} placeholder="Ex.: frontal, vértex, lado direito; condição de captura"/></label><label>Vincular a consulta<select name="appointmentId" defaultValue=""><option value="">Sem vínculo</option>{data.appointments.filter(a=>a.patientId===selectedPatientId).map(a=><option key={a.id} value={a.id}>{a.date} · {a.type}</option>)}</select></label><p className="hint">Imagem até 12 MB. O arquivo é guardado separado dos dados estruturados do prontuário.</p><div className="modalActions"><button type="button" className="button outline" onClick={()=>setMediaForm(false)}>Cancelar</button><button className="button primary">Salvar imagem</button></div></form></Modal>}
-  </main>;
+    if (!ready) return;
+    const version = ++saveVersion.current;
+    const timer = setTimeout(() => {
+      const snapshot = JSON.stringify(data);
+      saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
+        const response = await fetch('/api/clinic', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: JSON.parse(snapshot) }) });
+        if (!response.ok) throw new Error((await response.json()).error || 'Falha ao salvar.');
+        if (version === saveVersion.current) setSaveError('');
+      }).catch(error => {
+        if (version === saveVersion.current) setSaveError(error instanceof Error ? error.message : 'Falha ao salvar.');
+      });
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [data, ready]);
+
+  if (access !== 'authenticated' || !ready) {
+    return <Login state={access === 'authenticated' ? 'loading' : access} error={accessError} onAuthenticated={() => setAccess('loading')} />;
+  }
+
+  const scheduledCount = data.appointments.filter(item => item.status === 'Agendada' && item.date.startsWith(monthKey(new Date()))).length;
+  const openAppointment = (appointment: Appointment) => setAppointmentDraft({ appointment, date: appointment.date });
+  const newAppointment = (date = selectedDate, patientId?: string) => setAppointmentDraft({ date, patientId });
+  const createPatient = (name: string) => {
+    const patient = quickPatient(name);
+    setData(current => ({ ...current, patients: [patient, ...current.patients] }));
+    return patient.id;
+  };
+  const savePatient = (patient: Patient) => {
+    setData(current => ({ ...current, patients: current.patients.some(item => item.id === patient.id) ? current.patients.map(item => item.id === patient.id ? patient : item) : [patient, ...current.patients] }));
+    setPatientDraft(null);
+  };
+  const deletePatient = (id: string) => {
+    setData(current => ({
+      ...current,
+      patients: current.patients.filter(item => item.id !== id),
+      appointments: current.appointments.filter(item => item.patientId !== id),
+      notes: current.notes.filter(item => item.patientId !== id),
+    }));
+    if (selectedPatientId === id) setSelectedPatientId('');
+    setPatientDraft(null);
+  };
+  async function logout() {
+    await fetch('/api/auth', { method: 'DELETE' }).catch(() => {});
+    window.location.reload();
+  }
+
+  return (
+    <>
+      <Shell view={view} onNavigate={setView} settings={data.settings} scheduledCount={scheduledCount} onLogout={logout}>
+        {view === 'Visão geral' && <Overview data={data} month={month} onMonthChange={setMonth} onNew={() => newAppointment(dayKey(new Date()))} onOpen={openAppointment} onNavigate={setView} />}
+        {view === 'Agenda' && <Agenda data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => newAppointment(date)} onOpen={openAppointment} />}
+        {view === 'Pacientes' && <Patients data={data} onNew={() => setPatientDraft({})} onEdit={patient => setPatientDraft({ patient })} onOpenRecord={id => { setSelectedPatientId(id); setView('Prontuário'); }} />}
+        {view === 'Prontuário' && <Record data={data} setData={setData} patientId={selectedPatientId} onSelectPatient={setSelectedPatientId} onEditPatient={patient => setPatientDraft({ patient })} onNewAppointment={id => newAppointment(dayKey(new Date()), id)} onError={setNotice} />}
+        {view === 'Financeiro' && <Finance data={data} setData={setData} month={month} onMonthChange={setMonth} />}
+        {view === 'Todos os dias' && <Daily />}
+        {view === 'Configurações' && <Settings data={data} setData={setData} />}
+      </Shell>
+
+      {appointmentDraft && (
+        <AppointmentModal
+          data={data}
+          appointment={appointmentDraft.appointment}
+          initialDate={appointmentDraft.date}
+          initialPatientId={appointmentDraft.patientId}
+          onCreatePatient={createPatient}
+          onClose={() => setAppointmentDraft(null)}
+          onSave={appointment => {
+            setData(current => ({ ...current, appointments: current.appointments.some(item => item.id === appointment.id) ? current.appointments.map(item => item.id === appointment.id ? appointment : item) : [...current.appointments, appointment] }));
+            setSelectedDate(appointment.date);
+            setMonth(appointment.date.slice(0, 7));
+            setAppointmentDraft(null);
+          }}
+          onDelete={id => { setData(current => ({ ...current, appointments: current.appointments.filter(item => item.id !== id) })); setAppointmentDraft(null); }}
+        />
+      )}
+      {patientDraft && <PatientModal patient={patientDraft.patient} onSave={savePatient} onDelete={deletePatient} onClose={() => setPatientDraft(null)} />}
+      {saveError && <Toast tone="danger" message={`Alterações não salvas: ${saveError}`} action={<button type="button" className="z-btn secondary sm" onClick={() => setData(current => ({ ...current }))}>Tentar de novo</button>} />}
+      {notice && !saveError && <Toast tone="danger" message={notice} onClose={() => setNotice('')} />}
+    </>
+  );
 }
-function Metric({title,value,note,icon,tone}:{title:string;value:string;note:string;icon:string;tone?:'positive'|'negative'}) { return <article className="metricCard"><div className="metricTop"><span>{title}</span><span className="metricIcon">{icon}</span></div><strong className={tone==='negative'?'negativeMoney':tone==='positive'?'positiveMoney':''}>{value}</strong><small>{note}</small></article>; }
-function NoteField({label,value}:{label:string;value:string}) { return <div className="noteField"><strong>{label}</strong><p>{value}</p></div>; }
-function SettingsList({title,values,value,setValue,add,remove}:{title:string;values:string[];value:string;setValue:React.Dispatch<React.SetStateAction<string>>;add:()=>void;remove:(value:string)=>void}) { return <section className="settingsList"><h3>{title}</h3><form onSubmit={e=>{e.preventDefault();add();}}><input value={value} onChange={e=>setValue(e.target.value)} placeholder="Adicionar opção personalizada"/><button className="button outline" disabled={!value.trim()}>Adicionar</button></form><ul>{values.map(item=><li key={item}><span>{item}</span><button className="moreButton" aria-label={`Remover ${item}`} onClick={()=>remove(item)}>×</button></li>)}</ul></section>; }
-function Modal({title,close,children}:{title:string;close:()=>void;children:React.ReactNode}) { return <div className="overlay" onMouseDown={e=>{if(e.target===e.currentTarget)close();}}><section className="modal"><div className="modalHeader"><h2>{title}</h2><button onClick={close} aria-label="Fechar">×</button></div>{children}</section></div>; }
