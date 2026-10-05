@@ -146,9 +146,11 @@ html, body, button, input, select, textarea { font-family: var(--sc-font); }
 .accessCard>p{font-size:13px;line-height:1.6;color:var(--muted)}.accessCard code{font-size:12px}
 .accessForm{display:grid;gap:14px;margin-top:20px}.accessForm .button{min-height:44px}
 .passwordField{position:relative;display:flex;align-items:center}
-.accessForm .passwordField input{width:100%;padding-right:82px}
-.passwordToggle{position:absolute;right:10px;border:0;background:transparent;color:var(--sc-brand);font:600 11px var(--sc-font);cursor:pointer}
-.passwordToggle:focus-visible{outline:2px solid var(--sc-brand);outline-offset:2px;border-radius:4px}
+.accessForm .passwordField input{width:100%;padding-right:48px}
+.passwordToggle{position:absolute;right:8px;display:grid;place-items:center;width:36px;height:36px;border:0;border-radius:8px;background:transparent;color:var(--sc-brand);cursor:pointer}
+.passwordToggle svg{width:19px;height:19px}
+.passwordToggle:hover{background:var(--surface-soft)}
+.passwordToggle:focus-visible{outline:2px solid var(--sc-brand);outline-offset:2px}
 .accessError{margin:0;color:#a53e38;font-size:12px}
 @media(max-width:760px){
   .view-home .appointmentsPanel,.view-home .dailyHighlight{grid-column:1/-1}
