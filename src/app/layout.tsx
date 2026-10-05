@@ -3,7 +3,7 @@ import './design-system.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'NÓRIA | Gestão clínica',
+  title: 'ZAINDU | Gestão clínica',
   description: 'Plataforma de gestão clínica personalizável para profissionais da saúde.',
 };
 

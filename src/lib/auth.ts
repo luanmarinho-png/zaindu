@@ -1,7 +1,11 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { NextRequest } from 'next/server';
 
-export const CLINIC_SESSION_COOKIE = 'noria_clinic_session';
+export const CLINIC_SESSION_COOKIE = 'zaindu_clinic_session';
+
+export function clinicUsername(): string | undefined {
+  return process.env.CLINIC_ACCESS_USERNAME || undefined;
+}
 
 export function clinicPassword(): string | undefined {
   return process.env.CLINIC_ACCESS_PASSWORD || undefined;
@@ -14,9 +18,10 @@ export function safeSecretEqual(value: string, expected: string): boolean {
 }
 
 export function clinicSessionToken(): string | undefined {
+  const username = clinicUsername();
   const password = clinicPassword();
-  if (!password) return undefined;
-  return createHmac('sha256', password).update('noria-clinic-session-v1').digest('hex');
+  if (!username || !password) return undefined;
+  return createHmac('sha256', password).update(`zaindu-clinic-session-v1:${username}`).digest('hex');
 }
 
 export function hasClinicSession(request: NextRequest): boolean {

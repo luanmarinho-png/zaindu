@@ -2,7 +2,7 @@
    As classes .sc-* são primitivas reutilizáveis; a interface da clínica usa os
    mesmos tokens nos componentes já existentes. */
 :root {
-  /* Tokens-base do DS ajustados à identidade visual Raiz Viva. */
+  /* Tokens-base do DS ajustados à identidade visual ZAINDU. */
   --sc-brand: #647055;
   --sc-brand-hover: #4b513b;
   --sc-brand-soft: rgba(100, 112, 85, 0.1);

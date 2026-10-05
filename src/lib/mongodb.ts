@@ -1,6 +1,6 @@
 import { MongoClient, type Db } from 'mongodb';
 
-const databaseName = process.env.MONGODB_DB || 'noria_clinica';
+const databaseName = process.env.MONGODB_DB || 'zaindu_clinica';
 
 declare global {
   var clinicMongoClient: MongoClient | undefined;

@@ -1,20 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { clinicPassword, clinicSessionToken, CLINIC_SESSION_COOKIE, hasClinicSession, safeSecretEqual } from '@/lib/auth';
+import { clinicPassword, clinicSessionToken, clinicUsername, CLINIC_SESSION_COOKIE, hasClinicSession, safeSecretEqual } from '@/lib/auth';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const configured = Boolean(clinicPassword());
+  const configured = Boolean(clinicUsername() && clinicPassword());
   return NextResponse.json({ configured, authenticated: configured && hasClinicSession(request) }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(request: NextRequest) {
+  const username = clinicUsername();
   const password = clinicPassword();
-  if (!password) return NextResponse.json({ error: 'Configure CLINIC_ACCESS_PASSWORD para liberar o acesso.' }, { status: 503 });
-  let submitted = '';
-  try { submitted = String((await request.json()).password || ''); } catch { return NextResponse.json({ error: 'Informe a senha de acesso.' }, { status: 400 }); }
-  if (!safeSecretEqual(submitted, password)) return NextResponse.json({ error: 'Senha incorreta.' }, { status: 401 });
+  if (!username || !password) return NextResponse.json({ error: 'Configure CLINIC_ACCESS_USERNAME e CLINIC_ACCESS_PASSWORD para liberar o acesso.' }, { status: 503 });
+  let submittedUsername = '';
+  let submittedPassword = '';
+  try {
+    const body = await request.json();
+    submittedUsername = String(body.username || '').trim();
+    submittedPassword = String(body.password || '');
+  } catch { return NextResponse.json({ error: 'Informe usuário e senha.' }, { status: 400 }); }
+  if (!safeSecretEqual(submittedUsername, username) || !safeSecretEqual(submittedPassword, password)) return NextResponse.json({ error: 'Usuário ou senha incorretos.' }, { status: 401 });
   const token = clinicSessionToken();
   if (!token) return NextResponse.json({ error: 'A sessão não pôde ser iniciada.' }, { status: 503 });
   const response = NextResponse.json({ authenticated: true });
