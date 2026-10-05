@@ -20,9 +20,10 @@ type Props = {
   onDelete: (id: string) => void;
   onCreatePatient: (name: string) => string;
   onClose: () => void;
+  showMoney?: boolean;
 };
 
-export function AppointmentModal({ data, appointment, initialDate, initialPatientId = '', onSave, onDelete, onCreatePatient, onClose }: Props) {
+export function AppointmentModal({ data, appointment, initialDate, initialPatientId = '', onSave, onDelete, onCreatePatient, onClose, showMoney = true }: Props) {
   const types = data.settings.appointmentTypes.length ? data.settings.appointmentTypes : ['Consulta'];
   const [patientId, setPatientId] = useState(appointment?.patientId || initialPatientId);
   const [type, setType] = useState(appointment?.type || types[0]);
@@ -84,9 +85,11 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
             {!types.includes(type) && <option>{type}</option>}
           </select>
         </Field>
-        <Field label="Valor" icon={Wallet} htmlFor="appt-price" hint={suggested !== null ? `Sugerido: ${brl(suggested)}` : undefined}>
-          <MoneyInput id="appt-price" value={effectivePrice} onChange={value => { setPrice(value); setPriceTouched(true); }} />
-        </Field>
+        {showMoney && (
+          <Field label="Valor" icon={Wallet} htmlFor="appt-price" hint={suggested !== null ? `Sugerido: ${brl(suggested)}` : undefined}>
+            <MoneyInput id="appt-price" value={effectivePrice} onChange={value => { setPrice(value); setPriceTouched(true); }} />
+          </Field>
+        )}
         <Field label="Data" icon={CalendarDays} required htmlFor="appt-date">
           <input id="appt-date" className="z-input" type="date" required value={date} onChange={event => setDate(event.target.value)} />
         </Field>

@@ -18,6 +18,11 @@ export const ROLE_LABEL: Record<Role, string> = { admin: 'Administrador', manage
 // Secretária é o caso mais comum de membro: começa só com agenda e pacientes.
 export const DEFAULT_MEMBER_MODULES: Module[] = ['agenda', 'pacientes'];
 
+// Perfil de acesso: a gestora define uma vez (ex.: Secretária) e cada pessoa nova com esse perfil herda os módulos.
+// Mudar o perfil muda o acesso de todos que o usam.
+export type AccessProfile = { id: string; name: string; modules: Module[] };
+export const DEFAULT_PROFILES: AccessProfile[] = [{ id: 'secretaria', name: 'Secretária', modules: DEFAULT_MEMBER_MODULES }];
+
 export const isModule = (value: unknown): value is Module => typeof value === 'string' && (ALL_MODULES as string[]).includes(value);
 export const cleanModules = (value: unknown): Module[] => Array.isArray(value) ? ALL_MODULES.filter(id => value.includes(id)) : [];
 

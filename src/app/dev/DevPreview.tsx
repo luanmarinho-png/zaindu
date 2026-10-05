@@ -62,7 +62,7 @@ export function DevPreview({ papel, modelo }: { papel?: string; modelo?: string 
     <>
       <Shell view={canView(view, access) ? view : 'Visão geral'} onNavigate={setView} settings={data.settings} access={access} scheduledCount={3} onLogout={() => {}}>
         {view === 'Visão geral' && <Overview data={data} access={access} month={month} onMonthChange={setMonth} onNew={() => setAppt({ date: dayKey(new Date()) })} onOpen={a => setAppt({ appointment: a, date: a.date })} onNavigate={setView} />}
-        {view === 'Agenda' && <Agenda data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => setAppt({ date })} onOpen={a => setAppt({ appointment: a, date: a.date })} />}
+        {view === 'Agenda' && <Agenda showMoney={access.modules.includes('financeiro')} data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => setAppt({ date })} onOpen={a => setAppt({ appointment: a, date: a.date })} />}
         {view === 'Pacientes' && <Patients data={data} onNew={() => setPatientDraft({})} onEdit={patient => setPatientDraft({ patient })} onOpenRecord={id => { setPatientId(id); setView('Prontuário'); }} />}
         {view === 'Prontuário' && <Record data={data} setData={setData} patientId={patientId} onSelectPatient={setPatientId} onEditPatient={patient => setPatientDraft({ patient })} onNewAppointment={() => setAppt({ date: dayKey(new Date()) })} onError={() => {}} />}
         {view === 'Financeiro' && <Finance data={data} setData={setData} month={month} onMonthChange={setMonth} />}
@@ -70,7 +70,7 @@ export function DevPreview({ papel, modelo }: { papel?: string; modelo?: string 
         {view === 'Configurações' && <Settings data={data} setData={setData} />}
         {view === 'Equipe' && <Team access={access} clinicId="dev" />}
       </Shell>
-      {appt && <AppointmentModal data={data} appointment={appt.appointment} initialDate={appt.date} onCreatePatient={name => { const p = quickPatient(name); setData(d => ({ ...d, patients: [p, ...d.patients] })); return p.id; }} onClose={() => setAppt(null)} onSave={a => { setData(d => ({ ...d, appointments: [...d.appointments.filter(x => x.id !== a.id), a] })); setAppt(null); }} onDelete={id => { setData(d => ({ ...d, appointments: d.appointments.filter(x => x.id !== id) })); setAppt(null); }} />}
+      {appt && <AppointmentModal showMoney={access.modules.includes('financeiro')} data={data} appointment={appt.appointment} initialDate={appt.date} onCreatePatient={name => { const p = quickPatient(name); setData(d => ({ ...d, patients: [p, ...d.patients] })); return p.id; }} onClose={() => setAppt(null)} onSave={a => { setData(d => ({ ...d, appointments: [...d.appointments.filter(x => x.id !== a.id), a] })); setAppt(null); }} onDelete={id => { setData(d => ({ ...d, appointments: d.appointments.filter(x => x.id !== id) })); setAppt(null); }} />}
       {patientDraft && <PatientModal patient={patientDraft.patient} onSave={p => { setData(d => ({ ...d, patients: [...d.patients.filter(x => x.id !== p.id), p] })); setPatientDraft(null); }} onClose={() => setPatientDraft(null)} />}
     </>
   );

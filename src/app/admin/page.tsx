@@ -6,7 +6,7 @@ import { Team } from '@/components/clinic/Team';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
-import { applyBrand } from '@/lib/clinic/brand';
+import { accentOf, applyBrand, isLightColor } from '@/lib/clinic/brand';
 import type { Access, Brand } from '@/lib/clinic/permissions';
 import { TEMPLATE_IDS, TEMPLATES, type TemplateId } from '@/lib/clinic/templates';
 
@@ -78,7 +78,7 @@ export default function AdminPage() {
           {clinics.map(clinic => {
             const manager = clinic.members.find(item => item.role === 'manager');
             return (
-              <li key={clinic.id} className="z-card white z-clinic-card" style={{ '--clinic': clinic.color } as React.CSSProperties}>
+              <li key={clinic.id} className="z-card white z-clinic-card" style={{ '--clinic': clinic.color, '--clinic-ink': isLightColor(clinic.color) ? accentOf(clinic.color) : '#fff' } as React.CSSProperties}>
                 <div className="z-clinic-row">
                   {clinic.logo ? <img className="z-clinic-logo" src={clinic.logo} alt="" /> : <span className="z-clinic-logo swatch" aria-hidden="true">{clinic.name.slice(0, 1).toUpperCase()}</span>}
                   <div className="z-clinic-main">
@@ -176,16 +176,16 @@ function ClinicModal({ clinic, onClose, onSaved }: { clinic?: ClinicRow; onClose
             <span className="z-hint">A clínica pode acrescentar etapas próprias depois, em Configurações.</span>
           </div>
         </>}
-        <Field label="Cor da marca" icon={Palette} htmlFor="c-color">
+        <Field label="Cor da marca" icon={Palette} htmlFor="c-color" hint={isLightColor(color) ? 'Cor clara: vira o fundo do painel, e os botões ficam no tom escuro do DS SC.' : 'Usada em botões, menu ativo e destaques.'}>
           <div className="z-color-row">
             <input id="c-color" type="color" className="z-color" value={color} onChange={event => setColor(event.target.value)} />
             <span className="num t-muted">{color.toUpperCase()}</span>
-            <span className="z-color-preview" style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${color} 88%, #000), color-mix(in srgb, ${color} 82%, #fff))` }}>Botão</span>
+            <span className="z-color-preview" style={{ background: `linear-gradient(135deg, color-mix(in srgb, ${accentOf(color)} 88%, #000), color-mix(in srgb, ${accentOf(color)} 82%, #fff))`, boxShadow: `0 0 0 6px ${isLightColor(color) ? color : 'transparent'}` }}>Botão</span>
           </div>
         </Field>
         <Field label="Logo" icon={ImagePlus} htmlFor="c-logo" hint="PNG, JPG, WEBP ou SVG, até 300 KB. Quadrado fica melhor.">
           <div className="z-color-row">
-            {logo ? <img className="z-clinic-logo" src={logo} alt="Logo atual" /> : <span className="z-clinic-logo swatch" style={{ '--clinic': color } as React.CSSProperties} aria-hidden="true">{(name || 'C').slice(0, 1).toUpperCase()}</span>}
+            {logo ? <img className="z-clinic-logo" src={logo} alt="Logo atual" /> : <span className="z-clinic-logo swatch" style={{ '--clinic': color, '--clinic-ink': isLightColor(color) ? accentOf(color) : '#fff' } as React.CSSProperties} aria-hidden="true">{(name || 'C').slice(0, 1).toUpperCase()}</span>}
             <input id="c-logo" type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" className="z-file" onChange={event => pickLogo(event.target.files?.[0])} />
             {logo && <button type="button" className="z-btn ghost sm" onClick={() => setLogo('')}>Remover</button>}
           </div>

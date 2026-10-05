@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { brandOf, clinics, getAccess, states } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 import { canWrite, readableStore, STORE_KEYS, type Module } from '@/lib/clinic/permissions';
-import type { Store } from '@/lib/clinic/store';
+import { serviceCost, type Service, type Store, type Supply } from '@/lib/clinic/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,6 +49,20 @@ async function guardPatients(database: Db, clinicId: string, modules: Module[], 
   return blocked.length ? 'Este paciente tem prontuário. Só quem tem acesso ao prontuário pode excluí-lo.' : list;
 }
 
+// Quem não vê valores não pode mudá-los: consulta existente mantém o valor salvo; consulta nova recebe o preço sugerido do atendimento.
+async function keepPrices(database: Db, clinicId: string, next: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
+  const current = ((await states(database).findOne({ _id: clinicId }, { projection: { 'data.appointments': 1, 'data.services': 1, 'data.supplies': 1, 'data.targetMargin': 1 } }))?.data || {}) as Record<string, unknown>;
+  const prices = new Map((Array.isArray(current.appointments) ? current.appointments as Record<string, unknown>[] : []).map(item => [idOf(item), Number(item.price) || 0]));
+  const services = Array.isArray(current.services) ? current.services as Service[] : [];
+  const supplies = Array.isArray(current.supplies) ? current.supplies as Supply[] : [];
+  const margin = Number(current.targetMargin) || 0;
+  const suggested = (type: unknown) => {
+    const service = services.find(item => String(item.name).toLocaleLowerCase('pt-BR') === String(type || '').toLocaleLowerCase('pt-BR'));
+    return service ? Math.round(serviceCost(service, supplies) * (1 + margin / 100) * 100) / 100 : 0;
+  };
+  return next.map(item => ({ ...item, price: prices.has(idOf(item)) ? prices.get(idOf(item)) : suggested(item?.type) }));
+}
+
 const validFor = (key: keyof Store, value: unknown) =>
   ARRAY_KEYS.has(key) ? Array.isArray(value) : NUMBER_KEYS.has(key) ? typeof value === 'number' && Number.isFinite(value) : Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
@@ -69,8 +83,12 @@ export async function GET() {
       const changed = Object.keys(clean).filter(key => JSON.stringify(clean[key as keyof typeof clean]) !== JSON.stringify(document.data[key]));
       if (changed.length) await states(database).updateOne({ _id: access.clinicId }, { $set: { ...Object.fromEntries(changed.map(key => [`data.${key}`, clean[key as keyof typeof clean]])), updatedAt: new Date() } });
     }
-    // Quem não tem o módulo nem recebe aquela parte dos dados.
-    return NextResponse.json({ data: data && readableStore(data, access.modules), brand: brandOf(clinic), access }, { headers: noStore });
+    // Quem não tem o módulo nem recebe aquela parte dos dados; sem Financeiro, as consultas vão sem valor.
+    const visible = data && readableStore(data, access.modules);
+    if (visible && !access.modules.includes('financeiro') && Array.isArray(visible.appointments)) {
+      visible.appointments = visible.appointments.map(item => { const { price: _price, ...rest } = item as Record<string, unknown>; return rest; });
+    }
+    return NextResponse.json({ data: visible, brand: brandOf(clinic), access }, { headers: noStore });
   } catch {
     return NextResponse.json({ error: 'Não foi possível conectar ao MongoDB. Confira MONGODB_URI e MONGODB_DB na Vercel.' }, { status: 503, headers: noStore });
   }
@@ -96,6 +114,9 @@ export async function PUT(request: NextRequest) {
       const guarded = await guardPatients(database, access.clinicId, access.modules, incoming.patients as Record<string, unknown>[]);
       if (typeof guarded === 'string') return NextResponse.json({ error: guarded }, { status: 403 });
       incoming.patients = guarded;
+    }
+    if (sent.includes('appointments') && !access.modules.includes('financeiro')) {
+      incoming.appointments = await keepPrices(database, access.clinicId, incoming.appointments as Record<string, unknown>[]);
     }
     const update: Record<string, unknown> = { updatedAt: new Date() };
     for (const key of sent) update[`data.${key}`] = incoming[key];

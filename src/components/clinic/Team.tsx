@@ -1,18 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AtSign, Eye, EyeOff, KeyRound, Pencil, Trash2, UserPlus, UserRound, Users } from 'lucide-react';
+import { AtSign, Eye, EyeOff, IdCard, KeyRound, Pencil, Plus, ShieldCheck, Trash2, UserPlus, UserRound, Users } from 'lucide-react';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
-import { DEFAULT_MEMBER_MODULES, MODULES, ROLE_LABEL, type Access, type Module } from '@/lib/clinic/permissions';
+import { DEFAULT_MEMBER_MODULES, MODULES, ROLE_LABEL, type Access, type AccessProfile, type Module } from '@/lib/clinic/permissions';
 import { PageHeader } from './Shell';
 
-export type TeamMember = { email: string; username: string; name: string; role: 'manager' | 'member'; modules: Module[] };
+export type TeamMember = { email: string; username: string; name: string; role: 'manager' | 'member'; profileId: string; modules: Module[] };
 type Draft = { member?: TeamMember };
 
-async function call(method: string, body: Record<string, unknown>) {
-  const response = await fetch('/api/team', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+async function call(method: string, body: Record<string, unknown>, path = '/api/team') {
+  const response = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const result = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(result.error || 'Não foi possível salvar.');
   return result as { message?: string };
@@ -21,6 +21,8 @@ async function call(method: string, body: Record<string, unknown>) {
 // Equipe da clínica: a gestora libera módulos para cada pessoa; o admin também cria gestoras.
 export function Team({ access, clinicId, embedded }: { access: Access; clinicId: string; embedded?: boolean }) {
   const [list, setList] = useState<TeamMember[] | null>(null);
+  const [profiles, setProfiles] = useState<AccessProfile[]>([]);
+  const [profileDraft, setProfileDraft] = useState<{ profile?: AccessProfile } | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -32,6 +34,7 @@ export function Team({ access, clinicId, embedded }: { access: Access; clinicId:
       const result = await response.json();
       if (!response.ok) throw new Error(result.error);
       setList(result.members);
+      setProfiles(result.profiles || []);
       setError('');
     } catch (err) {
       setError(err instanceof Error && err.message ? err.message : 'Não foi possível carregar a equipe.');
@@ -54,6 +57,18 @@ export function Team({ access, clinicId, embedded }: { access: Access; clinicId:
     }
   }
 
+  async function saveProfiles(next: AccessProfile[], message: string) {
+    try {
+      await call('PUT', { clinicId, profiles: next }, '/api/team/profiles');
+      setProfileDraft(null);
+      setNotice(message);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar o perfil.');
+    }
+  }
+  const profileName = (id: string) => profiles.find(item => item.id === id)?.name;
+
   const add = <button type="button" className="z-btn brand" onClick={() => setDraft({})}><UserPlus />Adicionar pessoa</button>;
   return (
     <>
@@ -73,6 +88,7 @@ export function Team({ access, clinicId, embedded }: { access: Access; clinicId:
                 <div className="z-taglist z-team-modules">
                   {member.role === 'manager'
                     ? <span className="z-badge brand sm">{ROLE_LABEL.manager} · acesso total</span>
+                    : member.profileId && profileName(member.profileId) ? <span className="z-badge brand sm"><ShieldCheck aria-hidden="true" />{profileName(member.profileId)}</span>
                     : member.modules.length ? member.modules.map(id => <span key={id} className="z-badge sm">{MODULES.find(item => item.id === id)?.label}</span>) : <span className="z-badge warn sm">Sem módulos</span>}
                 </div>
                 {editable(member) && (
@@ -90,25 +106,64 @@ export function Team({ access, clinicId, embedded }: { access: Access; clinicId:
           <div className="z-empty"><Users aria-hidden="true" /><strong>Ninguém na equipe ainda</strong><span>{isAdmin ? 'Comece pela gestora da clínica.' : 'Adicione a secretária ou outros profissionais.'}</span></div>
         )}
       </section>
-      {draft && <MemberModal clinicId={clinicId} member={draft.member} isAdmin={isAdmin} firstMember={!list?.length} onClose={() => setDraft(null)} onSaved={message => { setDraft(null); setNotice(message); load(); }} />}
+      <section className={`z-card white ${embedded ? 'z-team-embedded' : 'z-section'}`}>
+        <header className="z-section-head">
+          <div>
+            <h3 className={embedded ? 't-h2' : 't-h1'}><IdCard aria-hidden="true" className="z-inline-icon" />Perfis de acesso</h3>
+            <p className="t-body t-muted">Defina uma vez o que cada função vê. Quem recebe o perfil herda os módulos, e mudar o perfil muda o acesso de todos que o usam.</p>
+          </div>
+          <button type="button" className="z-btn secondary" onClick={() => setProfileDraft({})}><Plus />Novo perfil</button>
+        </header>
+        {profiles.length ? (
+          <ul className="z-profile-grid">
+            {profiles.map(profile => {
+              const users = (list || []).filter(member => member.profileId === profile.id).length;
+              return (
+                <li key={profile.id} className="z-profile">
+                  <div className="z-profile-head">
+                    <strong><ShieldCheck aria-hidden="true" />{profile.name}</strong>
+                    <span className="t-muted num">{users} pessoa(s)</span>
+                  </div>
+                  <div className="z-taglist">{profile.modules.length ? profile.modules.map(id => <span key={id} className="z-badge sm">{MODULES.find(item => item.id === id)?.label}</span>) : <span className="z-badge warn sm">Só visão geral</span>}</div>
+                  <div className="z-row-actions">
+                    <button type="button" className="z-close" onClick={() => setProfileDraft({ profile })} aria-label={`Editar perfil ${profile.name}`} title="Editar"><Pencil /></button>
+                    <button type="button" className="z-close" onClick={() => saveProfiles(profiles.filter(item => item.id !== profile.id), `Perfil ${profile.name} removido. Quem o usava manteve o mesmo acesso, agora como personalizado.`)} aria-label={`Remover perfil ${profile.name}`} title="Remover"><Trash2 /></button>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        ) : <div className="z-empty"><span>Nenhum perfil. Crie um, por exemplo “Secretária”.</span></div>}
+      </section>
+      {profileDraft && (
+        <ProfileModal
+          profile={profileDraft.profile}
+          onClose={() => setProfileDraft(null)}
+          onSave={next => saveProfiles(profileDraft.profile ? profiles.map(item => item.id === next.id ? next : item) : [...profiles, next], `Perfil ${next.name} salvo.`)}
+        />
+      )}
+      {draft && <MemberModal profiles={profiles} clinicId={clinicId} member={draft.member} isAdmin={isAdmin} firstMember={!list?.length} onClose={() => setDraft(null)} onSaved={message => { setDraft(null); setNotice(message); load(); }} />}
       {notice && <Toast tone="success" message={notice} onClose={() => setNotice('')} />}
     </>
   );
 }
 
-function MemberModal({ clinicId, member, isAdmin, firstMember, onClose, onSaved }: {
-  clinicId: string; member?: TeamMember; isAdmin: boolean; firstMember: boolean; onClose: () => void; onSaved: (message: string) => void;
+function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose, onSaved }: {
+  profiles: AccessProfile[]; clinicId: string; member?: TeamMember; isAdmin: boolean; firstMember: boolean; onClose: () => void; onSaved: (message: string) => void;
 }) {
   const [name, setName] = useState(member?.name || '');
   const [username, setUsername] = useState(member?.username || '');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [role, setRole] = useState<TeamMember['role']>(member?.role || (isAdmin && firstMember ? 'manager' : 'member'));
+  const [profileId, setProfileId] = useState(member ? member.profileId : profiles[0]?.id || '');
   const [modules, setModules] = useState<Module[]>(member?.modules || DEFAULT_MEMBER_MODULES);
+  const profile = profiles.find(item => item.id === profileId);
+  const shown = profile ? profile.modules : modules;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const toggle = (id: Module) => setModules(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  const toggle = (id: Module) => !profile && setModules(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -116,8 +171,8 @@ function MemberModal({ clinicId, member, isAdmin, firstMember, onClose, onSaved 
     setError('');
     try {
       const result = member
-        ? await call('PATCH', { clinicId, email: member.email, name, modules, ...(isAdmin ? { role } : {}), ...(password ? { password } : {}) })
-        : await call('POST', { clinicId, name, username, password, role, modules });
+        ? await call('PATCH', { clinicId, email: member.email, name, profileId, modules, ...(isAdmin ? { role } : {}), ...(password ? { password } : {}) })
+        : await call('POST', { clinicId, name, username, password, role, profileId, modules });
       onSaved(result.message || 'Alterações salvas.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
@@ -157,9 +212,15 @@ function MemberModal({ clinicId, member, isAdmin, firstMember, onClose, onSaved 
         {role === 'member' && (
           <fieldset className="z-fieldset full z-module-list">
             <legend>O que pode acessar</legend>
+            <Field label="Perfil de acesso" icon={IdCard} htmlFor="t-profile" hint={profile ? 'Os módulos seguem o perfil. Escolha “Personalizado” para ajustar só para esta pessoa.' : 'Acesso só desta pessoa.'} full>
+              <select id="t-profile" className="z-select" value={profileId} onChange={event => { const next = profiles.find(item => item.id === event.target.value); if (!event.target.value && profile) setModules(profile.modules); setProfileId(next?.id || ''); }}>
+                {profiles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                <option value="">Personalizado</option>
+              </select>
+            </Field>
             {MODULES.map(item => (
-              <label key={item.id} className="z-switch z-module">
-                <input type="checkbox" checked={modules.includes(item.id)} onChange={() => toggle(item.id)} />
+              <label key={item.id} className={`z-switch z-module ${profile ? 'locked' : ''}`}>
+                <input type="checkbox" checked={shown.includes(item.id)} disabled={Boolean(profile)} onChange={() => toggle(item.id)} />
                 <span className="track" aria-hidden="true" />
                 <span><strong>{item.label}</strong><small className="t-muted">{item.hint}</small></span>
               </label>
@@ -167,6 +228,36 @@ function MemberModal({ clinicId, member, isAdmin, firstMember, onClose, onSaved 
           </fieldset>
         )}
         {error && <p className="z-callout danger full" role="alert">{error}</p>}
+      </div>
+    </Modal>
+  );
+}
+
+function ProfileModal({ profile, onClose, onSave }: { profile?: AccessProfile; onClose: () => void; onSave: (profile: AccessProfile) => void }) {
+  const [name, setName] = useState(profile?.name || '');
+  const [modules, setModules] = useState<Module[]>(profile?.modules || DEFAULT_MEMBER_MODULES);
+  const toggle = (id: Module) => setModules(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  return (
+    <Modal
+      title={profile ? `Editar perfil ${profile.name}` : 'Novo perfil de acesso'}
+      description={profile ? 'A mudança vale na hora para todos com este perfil.' : 'Ex.: Secretária, Enfermagem, Financeiro.'}
+      onClose={onClose}
+      onSubmit={event => { event.preventDefault(); if (name.trim()) onSave({ id: profile?.id || '', name: name.trim(), modules }); }}
+      footer={<><span className="spacer" /><button type="button" className="z-btn secondary" onClick={onClose}>Cancelar</button><button type="submit" className="z-btn brand">Salvar perfil</button></>}
+    >
+      <div className="z-form-grid">
+        <Field label="Nome do perfil" required icon={IdCard} htmlFor="p-name" full><input id="p-name" className="z-input" required value={name} onChange={event => setName(event.target.value)} placeholder="Secretária" /></Field>
+        <fieldset className="z-fieldset full z-module-list">
+          <legend>O que este perfil acessa</legend>
+          {MODULES.map(item => (
+            <label key={item.id} className="z-switch z-module">
+              <input type="checkbox" checked={modules.includes(item.id)} onChange={() => toggle(item.id)} />
+              <span className="track" aria-hidden="true" />
+              <span><strong>{item.label}</strong><small className="t-muted">{item.hint}</small></span>
+            </label>
+          ))}
+          <p className="z-hint">O que ficar desligado some do menu e não é enviado ao navegador dessa pessoa.</p>
+        </fieldset>
       </div>
     </Modal>
   );

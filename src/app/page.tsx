@@ -184,7 +184,7 @@ export default function Home() {
     <>
       <Shell view={current} onNavigate={setView} settings={data.settings} brand={brand} access={access} scheduledCount={can('agenda') ? scheduledCount : 0} onLogout={logout} onExitClinic={access.role === 'admin' ? exitClinic : undefined}>
         {current === 'Visão geral' && <Overview data={data} access={access} month={month} onMonthChange={setMonth} onNew={can('agenda') ? () => newAppointment(dayKey(new Date())) : undefined} onOpen={openAppointment} onNavigate={setView} />}
-        {current === 'Agenda' && <Agenda data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => newAppointment(date)} onOpen={appointment => setAppointmentDraft({ appointment, date: appointment.date })} />}
+        {current === 'Agenda' && <Agenda showMoney={can('financeiro')} data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => newAppointment(date)} onOpen={appointment => setAppointmentDraft({ appointment, date: appointment.date })} />}
         {current === 'Pacientes' && <Patients data={data} onNew={() => setPatientDraft({})} onEdit={patient => setPatientDraft({ patient })} onOpenRecord={can('prontuario') ? id => { setSelectedPatientId(id); setView('Prontuário'); } : undefined} />}
         {current === 'Prontuário' && <Record data={data} setData={setData} patientId={selectedPatientId} onSelectPatient={setSelectedPatientId} onEditPatient={can('pacientes') ? patient => setPatientDraft({ patient }) : undefined} onNewAppointment={can('agenda') ? id => newAppointment(dayKey(new Date()), id) : undefined} onError={setNotice} />}
         {current === 'Financeiro' && <Finance data={data} setData={setData} month={month} onMonthChange={setMonth} />}
@@ -195,6 +195,7 @@ export default function Home() {
 
       {appointmentDraft && (
         <AppointmentModal
+          showMoney={can('financeiro')}
           data={data}
           appointment={appointmentDraft.appointment}
           initialDate={appointmentDraft.date}

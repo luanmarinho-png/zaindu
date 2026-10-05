@@ -18,9 +18,11 @@ type Props = {
   onSelectDate: (date: string) => void;
   onNew: (date: string) => void;
   onOpen: (appointment: Appointment) => void;
+  // Sem o módulo Financeiro, a agenda não mostra valores.
+  showMoney?: boolean;
 };
 
-export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate, onNew, onOpen }: Props) {
+export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate, onNew, onOpen, showMoney = true }: Props) {
   const today = dayKey(new Date());
   const cells = useMemo(() => {
     const [year, monthIndex] = month.split('-').map(Number);
@@ -101,7 +103,7 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
           <header className="z-dayview-head">
             <div>
               <h2 className="t-h1">{capitalize(formatDate(selectedDate, { weekday: 'long', day: 'numeric', month: 'long' }))}</h2>
-              <p className="t-body t-muted">{dayList.length ? `${dayList.length} consulta(s) · ${brl(dayRevenue)} previstos` : 'Nenhuma consulta neste dia'}</p>
+              <p className="t-body t-muted">{dayList.length ? `${dayList.length} consulta(s)${showMoney ? ` · ${brl(dayRevenue)} previstos` : ''}` : 'Nenhuma consulta neste dia'}</p>
             </div>
           </header>
           {dayList.length ? (
@@ -110,7 +112,7 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
                 <li key={item.id}>
                   <button type="button" className="z-dayitem" onClick={() => onOpen(item)}>
                     <span className="z-dayitem-time num"><Clock aria-hidden="true" />{item.time}<small>{item.duration || 30} min</small></span>
-                    <span className="z-dayitem-main"><strong>{patientName(item.patientId)}</strong><small>{item.type}{item.price ? ` · ${brl(item.price)}` : ''}</small></span>
+                    <span className="z-dayitem-main"><strong>{patientName(item.patientId)}</strong><small>{item.type}{showMoney && item.price ? ` · ${brl(item.price)}` : ''}</small></span>
                     <StatusBadge status={item.status} small iconOnly />
                   </button>
                 </li>

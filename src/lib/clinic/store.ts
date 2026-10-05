@@ -59,7 +59,7 @@ export function cleanLocalStore(value: Partial<Store> | null | undefined): Store
     ...initial,
     ...(value || {}),
     patients,
-    appointments: (value?.appointments || []).filter(item => patientIds.has(item.patientId)).map(item => ({ ...item, duration: item.duration || 30 })),
+    appointments: (value?.appointments || []).filter(item => patientIds.has(item.patientId)).map(item => ({ ...item, duration: item.duration || 30, price: item.price || 0 })),
     notes: (value?.notes || []).filter(item => patientIds.has(item.patientId)).map(note => ({ ...note, selectedFindings: note.selectedFindings || [] })),
     profiles: Object.fromEntries(Object.entries(value?.profiles || {}).filter(([id]) => patientIds.has(id))),
     media: (value?.media || []).filter(item => patientIds.has(item.patientId)),

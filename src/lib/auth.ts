@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import type { Db } from 'mongodb';
 import { getDatabase } from '@/lib/mongodb';
 import { createClient, supabaseConfigured } from '@/lib/supabase/server';
-import { ALL_MODULES, cleanModules, type Access, type Brand } from '@/lib/clinic/permissions';
+import { ALL_MODULES, cleanModules, DEFAULT_PROFILES, type Access, type AccessProfile, type Brand } from '@/lib/clinic/permissions';
 import { isTemplateId, type TemplateId } from '@/lib/clinic/templates';
 
 // Só contas @zaindu.app entram na clínica, mesmo que alguém crie conta pela API pública do Supabase.
@@ -11,8 +11,9 @@ const ALLOWED_EMAIL_DOMAIN = '@zaindu.app';
 export const ADMIN_CLINIC_COOKIE = 'zaindu_clinic';
 export const DEFAULT_COLOR = '#647055';
 
-export type ClinicDoc = { _id: string; name: string; color: string; logo: string; template: TemplateId; createdAt: Date; updatedAt: Date };
-export type MemberDoc = { _id: string; clinicId: string; role: 'manager' | 'member'; name: string; modules: string[]; createdAt: Date; updatedAt: Date };
+export type ClinicDoc = { _id: string; name: string; color: string; logo: string; template: TemplateId; profiles?: AccessProfile[]; createdAt: Date; updatedAt: Date };
+// modules guarda o último acesso aplicado; com profileId, vale o que o perfil disser no momento.
+export type MemberDoc = { _id: string; clinicId: string; role: 'manager' | 'member'; name: string; modules: string[]; profileId?: string; createdAt: Date; updatedAt: Date };
 export type StateDoc = { _id: string; data: Record<string, unknown>; updatedAt?: Date };
 
 export function isClinicEmail(email: string | undefined): boolean {
@@ -72,15 +73,22 @@ export async function getAccess(loginEmail?: string): Promise<Access | null> {
   }
   const member = await members(db).findOne({ _id: email });
   if (!member) return null;
-  const clinic = await clinics(db).findOne({ _id: member.clinicId }, { projection: { _id: 1 } });
+  const clinic = await clinics(db).findOne({ _id: member.clinicId }, { projection: { _id: 1, profiles: 1 } });
   if (!clinic) return null;
   return {
     email,
     name: member.name,
     role: member.role,
     clinicId: clinic._id,
-    modules: member.role === 'manager' ? ALL_MODULES : cleanModules(member.modules),
+    modules: member.role === 'manager' ? ALL_MODULES : memberModules(member, profilesOf(clinic)),
   };
+}
+
+export const profilesOf = (clinic: Pick<ClinicDoc, 'profiles'> | null | undefined): AccessProfile[] => clinic?.profiles ?? DEFAULT_PROFILES;
+
+export function memberModules(member: Pick<MemberDoc, 'modules' | 'profileId'>, profiles: AccessProfile[]) {
+  const profile = member.profileId ? profiles.find(item => item.id === member.profileId) : undefined;
+  return cleanModules(profile ? profile.modules : member.modules);
 }
 
 export const templateOr = (value: unknown, fallback: TemplateId): TemplateId => isTemplateId(value) ? value : fallback;

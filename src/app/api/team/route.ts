@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { adminEmails, clinics, emailFromLogin, getAccess, isClinicEmail, members, type MemberDoc } from '@/lib/auth';
-import { fail, noStore, readJson } from '@/lib/api';
+import type { Db } from 'mongodb';
+import { adminEmails, clinics, emailFromLogin, isClinicEmail, memberModules, members, profilesOf, type MemberDoc } from '@/lib/auth';
+import { fail, noStore, readJson, teamScope as scope } from '@/lib/api';
 import { getDatabase } from '@/lib/mongodb';
-import { cleanModules, DEFAULT_MEMBER_MODULES, type Access } from '@/lib/clinic/permissions';
+import { cleanModules, DEFAULT_MEMBER_MODULES, type AccessProfile } from '@/lib/clinic/permissions';
 import { removeLogin, upsertLogin, type LoginResult } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
@@ -10,17 +11,23 @@ export const dynamic = 'force-dynamic';
 
 const MIN_PASSWORD = 8;
 
-// Admin gerencia qualquer clínica e cria gestoras; a gestora só gerencia a equipe da própria clínica.
-async function scope(requestedClinic: unknown): Promise<{ access: Access; clinicId: string } | NextResponse> {
-  const access = await getAccess();
-  if (!access) return fail('Acesso não autorizado.', 401);
-  if (access.role === 'member') return fail('Só a gestora da clínica gerencia a equipe.', 403);
-  const clinicId = access.role === 'admin' ? String(requestedClinic || access.clinicId || '') : access.clinicId;
-  if (!clinicId) return fail('Escolha uma clínica.', 400);
-  return { access, clinicId };
-}
+const view = (item: MemberDoc, profiles: AccessProfile[]) => ({
+  email: item._id, username: item._id.replace(/@zaindu\.app$/, ''), name: item.name, role: item.role,
+  profileId: item.profileId && profiles.some(profile => profile.id === item.profileId) ? item.profileId : '',
+  modules: memberModules(item, profiles),
+});
 
-const view = (item: MemberDoc) => ({ email: item._id, username: item._id.replace(/@zaindu\.app$/, ''), name: item.name, role: item.role, modules: item.modules });
+const clinicProfiles = async (db: Db, clinicId: string) => profilesOf(await clinics(db).findOne({ _id: clinicId }, { projection: { profiles: 1 } }));
+
+// Com perfil escolhido, os módulos vêm dele; sem perfil ("Personalizado"), da lista enviada.
+function accessFrom(body: Record<string, unknown> | null, profiles: AccessProfile[]): { profileId: string; modules: string[] } | string {
+  const profileId = String(body?.profileId || '');
+  if (profileId) {
+    const profile = profiles.find(item => item.id === profileId);
+    return profile ? { profileId, modules: profile.modules } : 'Perfil de acesso não encontrado.';
+  }
+  return { profileId: '', modules: Array.isArray(body?.modules) ? cleanModules(body.modules) : DEFAULT_MEMBER_MODULES };
+}
 
 function loginMessage(result: LoginResult): string {
   if (result === 'unconfigured') return 'Alterações salvas. A senha não mudou: falta a chave SUPABASE_SECRET_KEY no servidor.';
@@ -32,8 +39,9 @@ export async function GET(request: NextRequest) {
   try {
     const target = await scope(request.nextUrl.searchParams.get('clinicId'));
     if (target instanceof NextResponse) return target;
-    const list = await members(await getDatabase()).find({ clinicId: target.clinicId }).sort({ role: 1, name: 1 }).toArray();
-    return NextResponse.json({ members: list.map(view) }, { headers: noStore });
+    const db = await getDatabase();
+    const [list, profiles] = await Promise.all([members(db).find({ clinicId: target.clinicId }).sort({ role: 1, name: 1 }).toArray(), clinicProfiles(db, target.clinicId)]);
+    return NextResponse.json({ members: list.map(item => view(item, profiles)), profiles }, { headers: noStore });
   } catch {
     return fail('Não foi possível carregar a equipe.', 503);
   }
@@ -54,7 +62,11 @@ export async function POST(request: NextRequest) {
     // Senha sempre definida aqui: se alguém criou essa conta antes pelo cadastro público, a senha dela deixa de valer.
     if (password.length < MIN_PASSWORD) return fail(`A senha precisa de pelo menos ${MIN_PASSWORD} caracteres.`, 400);
     const db = await getDatabase();
-    if (!(await clinics(db).findOne({ _id: target.clinicId }, { projection: { _id: 1 } }))) return fail('Clínica não encontrada.', 404);
+    const clinic = await clinics(db).findOne({ _id: target.clinicId }, { projection: { profiles: 1 } });
+    if (!clinic) return fail('Clínica não encontrada.', 404);
+    const profiles = profilesOf(clinic);
+    const chosen = role === 'manager' ? { profileId: '', modules: [] } : accessFrom(body, profiles);
+    if (typeof chosen === 'string') return fail(chosen, 400);
     const existing = await members(db).findOne({ _id: email });
     if (existing && existing.clinicId !== target.clinicId) return fail('Este usuário já pertence a outra clínica.', 409);
     if (existing) return fail('Este usuário já faz parte da equipe.', 409);
@@ -62,9 +74,9 @@ export async function POST(request: NextRequest) {
     if (result === 'unconfigured') return fail('Falta a chave SUPABASE_SECRET_KEY no servidor para criar o login. Nada foi salvo.', 503);
     if (result instanceof Error) return fail(result.message.includes('password') ? 'Senha recusada pelo Supabase. Use uma senha mais forte.' : result.message, 400);
     const now = new Date();
-    const modules = role === 'manager' ? [] : (Array.isArray(body?.modules) ? cleanModules(body.modules) : DEFAULT_MEMBER_MODULES);
-    await members(db).insertOne({ _id: email, clinicId: target.clinicId, role, name, modules, createdAt: now, updatedAt: now });
-    return NextResponse.json({ member: view({ _id: email, clinicId: target.clinicId, role, name, modules, createdAt: now, updatedAt: now }), login: result, message: loginMessage(result) }, { status: 201, headers: noStore });
+    const doc: MemberDoc = { _id: email, clinicId: target.clinicId, role, name, modules: chosen.modules, ...(chosen.profileId ? { profileId: chosen.profileId } : {}), createdAt: now, updatedAt: now };
+    await members(db).insertOne(doc);
+    return NextResponse.json({ member: view(doc, profiles), login: result, message: loginMessage(result) }, { status: 201, headers: noStore });
   } catch {
     return fail('Não foi possível salvar o usuário.', 503);
   }
@@ -87,7 +99,13 @@ export async function PATCH(request: NextRequest) {
       if (!name) return fail('Informe o nome.', 400);
       update.name = name;
     }
-    if (body && 'modules' in body) update.modules = cleanModules(body.modules);
+    let unset = false;
+    if (body && ('modules' in body || 'profileId' in body)) {
+      const chosen = accessFrom(body, await clinicProfiles(db, target.clinicId));
+      if (typeof chosen === 'string') return fail(chosen, 400);
+      update.modules = chosen.modules;
+      if (chosen.profileId) update.profileId = chosen.profileId; else unset = true;
+    }
     if (isAdmin && (body?.role === 'manager' || body?.role === 'member')) update.role = body.role;
     let message = 'Alterações salvas.';
     const password = String(body?.password || '');
@@ -97,7 +115,7 @@ export async function PATCH(request: NextRequest) {
       if (result instanceof Error) return fail('Senha recusada pelo Supabase. Use uma senha mais forte.', 400);
       message = loginMessage(result);
     }
-    await members(db).updateOne({ _id: email }, { $set: update });
+    await members(db).updateOne({ _id: email }, { $set: update, ...(unset ? { $unset: { profileId: '' as const } } : {}) });
     return NextResponse.json({ saved: true, message }, { headers: noStore });
   } catch {
     return fail('Não foi possível salvar o usuário.', 503);
