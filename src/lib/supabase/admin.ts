@@ -3,7 +3,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 // Chave secreta só existe no servidor: com ela o app cria, troca a senha e remove logins.
 export function supabaseAdmin(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SECRET_KEY;
+  // Colar a chave pelo terminal pode trazer quebra de linha no fim.
+  const key = process.env.SUPABASE_SECRET_KEY?.trim();
   if (!url || !key) return null;
   return createClient(url, key, { auth: { autoRefreshToken: false, persistSession: false } });
 }
