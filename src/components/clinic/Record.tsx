@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Camera, CalendarPlus, ClipboardList, Columns2, FilePlus2, FileText, HeartPulse, ImagePlus, MessageCircleHeart, Pill, Printer, Trash2, TriangleAlert, UserPen } from 'lucide-react';
 import { MAIN_PROFESSIONAL, type Access, type Brand, type Professional } from '@/lib/clinic/permissions';
-import { DocumentModal, DOCUMENT_KINDS, printDocument } from './Documents';
+import { DocumentModal, printDocument } from './Documents';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { ageFrom, formatDate } from '@/lib/clinic/format';

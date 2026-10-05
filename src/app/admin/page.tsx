@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Building2, ChevronDown, ImagePlus, LogIn, LogOut, Palette, Pencil, Plus, Stethoscope, UserRound, Users } from 'lucide-react';
+import { Building2, ChevronDown, Trash2, ImagePlus, LogIn, LogOut, Palette, Pencil, Plus, Stethoscope, UserRound, Users } from 'lucide-react';
 import { Team } from '@/components/clinic/Team';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
@@ -123,6 +123,24 @@ function ClinicModal({ clinic, onClose, onSaved }: { clinic?: ClinicRow; onClose
   const [logo, setLogo] = useState(clinic?.logo || '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [confirmName, setConfirmName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  async function remove() {
+    if (!clinic) return;
+    setDeleting(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/clinics', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: clinic.id, confirm: confirmName }) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Não foi possível apagar.');
+      onSaved(`${clinic.name} foi apagada.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível apagar.');
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function pickLogo(file: File | undefined) {
     if (!file) return;
@@ -190,6 +208,16 @@ function ClinicModal({ clinic, onClose, onSaved }: { clinic?: ClinicRow; onClose
             {logo && <button type="button" className="z-btn ghost sm" onClick={() => setLogo('')}>Remover</button>}
           </div>
         </Field>
+        {clinic && (
+          <details className="z-danger-zone full">
+            <summary><Trash2 aria-hidden="true" />Apagar clínica</summary>
+            <p className="t-body t-muted">Apaga para sempre os pacientes, agenda, prontuários, fotos, financeiro, histórico e os logins da equipe desta clínica. Não dá para desfazer.</p>
+            <Field label={`Para confirmar, digite: ${clinic.name}`} htmlFor="c-confirm">
+              <input id="c-confirm" className="z-input" value={confirmName} onChange={event => setConfirmName(event.target.value)} autoComplete="off" />
+            </Field>
+            <button type="button" className="z-btn danger" disabled={deleting || confirmName.trim() !== clinic.name.trim()} onClick={remove}><Trash2 />{deleting ? 'Apagando…' : 'Apagar clínica para sempre'}</button>
+          </details>
+        )}
         {error && <p className="z-callout danger full" role="alert">{error}</p>}
       </div>
     </Modal>

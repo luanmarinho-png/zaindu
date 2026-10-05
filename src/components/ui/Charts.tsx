@@ -38,13 +38,16 @@ function columnPath(x: number, y: number, width: number, height: number): string
   return `M${x},${y + height}V${y + r}Q${x},${y} ${x + r},${y}H${x + width - r}Q${x + width},${y} ${x + width},${y + r}V${y + height}Z`;
 }
 
-export function ColumnChart({ points, series, format, height = 200, ariaLabel, labelEvery = 1 }: {
+export function ColumnChart({ points, series, format, height = 200, ariaLabel, labelEvery = 1, integer = false, emptyText }: {
   points: Point[];
   series: Series[];
   format: (value: number) => string;
   height?: number;
   ariaLabel: string;
   labelEvery?: number;
+  // Contagens: escala em números inteiros (sem "0, 1, 1" na grade).
+  integer?: boolean;
+  emptyText?: string;
 }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
@@ -53,7 +56,9 @@ export function ColumnChart({ points, series, format, height = 200, ariaLabel, l
   const top = 8;
   const plotWidth = Math.max(0, width - left - 4);
   const plotHeight = height - bottom - top;
-  const max = niceMax(Math.max(0, ...points.flatMap(point => point.values)));
+  const peak = Math.max(0, ...points.flatMap(point => point.values));
+  const max = integer ? Math.max(4, Math.ceil(peak / 2) * 2) : niceMax(peak);
+  const empty = peak === 0;
   const band = points.length ? plotWidth / points.length : 0;
   const gap = 2;
   const barWidth = Math.max(2, Math.min(24, (band * 0.7 - gap * (series.length - 1)) / series.length));
@@ -98,6 +103,7 @@ export function ColumnChart({ points, series, format, height = 200, ariaLabel, l
             })}
           </svg>
         )}
+        {empty && emptyText && width > 0 && <div className="z-chart-empty" style={{ left, bottom }}><span>{emptyText}</span></div>}
         {active && hover !== null && (
           <div className="z-chart-tip" style={{ left: Math.min(Math.max(left + band * hover + band / 2, 70), width - 70) }}>
             <strong>{active.tooltip || active.label}</strong>

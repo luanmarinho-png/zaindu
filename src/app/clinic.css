@@ -426,3 +426,18 @@ a.z-close { color: var(--sc-ink-muted); }
 .z-group .z-table td[data-label='Categoria'] .z-input { min-width: 150px; }
 .z-group .z-table td[data-label='Unidade'] .z-input { min-width: 96px; }
 .z-group .z-table td[data-label='Usado em'] { white-space: nowrap; }
+.z-danger-zone { display: grid; gap: 12px; padding: 14px 16px; border: 1px solid var(--sc-danger-line); border-radius: var(--sc-radius-field); background: color-mix(in srgb, var(--sc-danger-soft) 40%, var(--sc-card)); }
+.z-danger-zone summary { display: flex; align-items: center; gap: 8px; color: var(--sc-danger); font-weight: 600; cursor: pointer; list-style: none; }
+.z-danger-zone summary::-webkit-details-marker { display: none; }
+.z-danger-zone summary svg { width: 16px; height: 16px; }
+.z-danger-zone p { margin: 0; }
+.z-danger-zone .z-btn { justify-self: start; }
+.z-chart-empty { position: absolute; top: 8px; right: 4px; display: grid; place-items: center; color: var(--sc-ink-muted); font-size: 13px; pointer-events: none; }
+/* Cartões lado a lado com a mesma altura; o conteúdo vazio fica centralizado. */
+.z-overview { align-items: stretch; }
+.z-overview > .z-card { display: flex; flex-direction: column; gap: 16px; }
+.z-overview > .z-verse { gap: 10px; align-items: flex-start; }
+.z-overview > .z-card > .z-empty { flex: 1; align-content: center; }
+.z-overview > .z-card > .z-chart { flex: 1; align-content: end; }
+.z-verse > .z-btn { margin-top: auto; }
+.z-chart-empty span { padding: 4px 12px; border-radius: 999px; background: var(--sc-card); }

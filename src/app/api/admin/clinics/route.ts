@@ -1,4 +1,7 @@
+import { GridFSBucket } from 'mongodb';
 import { NextRequest, NextResponse } from 'next/server';
+import { audits } from '@/lib/audit';
+import { removeLogin } from '@/lib/supabase/admin';
 import { brandOf, clinics, DEFAULT_COLOR, ensureDefaultClinic, members, states, templateOr } from '@/lib/auth';
 import { cleanLogo, COLOR, fail, noStore, readJson, requireAdmin } from '@/lib/api';
 import { getDatabase } from '@/lib/mongodb';
@@ -83,5 +86,32 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ saved: true }, { headers: noStore });
   } catch {
     return fail('Não foi possível salvar a clínica.', 503);
+  }
+}
+
+// Apaga a clínica e tudo dela: dados, equipe (vínculos e logins), fotos e histórico. Exige o nome digitado.
+export async function DELETE(request: NextRequest) {
+  const admin = await requireAdmin().catch(() => fail('Não foi possível verificar o acesso agora.', 503));
+  if (admin instanceof NextResponse) return admin;
+  const body = await readJson(request);
+  const id = String(body?.id || '');
+  try {
+    const db = await getDatabase();
+    const clinic = await clinics(db).findOne({ _id: id });
+    if (!clinic) return fail('Clínica não encontrada.', 404);
+    if (String(body?.confirm || '').trim() !== clinic.name.trim()) return fail('Digite o nome da clínica exatamente como aparece para confirmar.', 400);
+    const team = await members(db).find({ clinicId: id }, { projection: { _id: 1 } }).toArray();
+    for (const member of team) await removeLogin(member._id).catch(() => {});
+    await members(db).deleteMany({ clinicId: id });
+    // Fotos antigas, de antes do multi-clínica, não têm clinicId e pertencem à "main".
+    const bucket = new GridFSBucket(db, { bucketName: 'patient_images' });
+    const filter = id === 'main' ? { $or: [{ 'metadata.clinicId': 'main' }, { 'metadata.clinicId': { $exists: false } }] } : { 'metadata.clinicId': id };
+    for (const file of await bucket.find(filter, { projection: { _id: 1 } }).toArray()) await bucket.delete(file._id).catch(() => {});
+    await states(db).deleteOne({ _id: id });
+    await audits(db).deleteMany({ clinicId: id });
+    await clinics(db).deleteOne({ _id: id });
+    return NextResponse.json({ deleted: true }, { headers: noStore });
+  } catch {
+    return fail('Não foi possível apagar a clínica.', 503);
   }
 }

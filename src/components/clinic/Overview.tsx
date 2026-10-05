@@ -135,7 +135,7 @@ export function Overview({ data, access, professionals = [], month, onMonthChang
           <header className="z-section-head">
             <div><h2 className="t-h1">Consultas por dia</h2><p className="t-body t-muted">{formatDate(`${month}-01`, { month: 'long', year: 'numeric' })}, sem as canceladas.</p></div>
           </header>
-          <ColumnChart points={perDay} series={[{ name: 'Consultas', color: 'var(--sc-brand)' }]} format={value => String(Math.round(value))} ariaLabel={`Consultas por dia em ${formatDate(`${month}-01`, { month: 'long' })}`} labelEvery={5} height={180} />
+          <ColumnChart points={perDay} series={[{ name: 'Consultas', color: 'var(--sc-brand)' }]} format={value => String(Math.round(value))} ariaLabel={`Consultas por dia em ${formatDate(`${month}-01`, { month: 'long' })}`} labelEvery={5} height={200} integer emptyText="Nenhuma consulta neste mês ainda." />
         </section>
         <section className="z-card white z-section z-insights">
           <header className="z-section-head"><div><h2 className="t-h1"><Lightbulb aria-hidden="true" className="z-inline-icon" />Insights</h2><p className="t-body t-muted">Leituras do mês com base na agenda.</p></div></header>
@@ -174,7 +174,7 @@ export function Overview({ data, access, professionals = [], month, onMonthChang
             </div>
           )}
         </section>
-        {data.settings.showDailyVerse !== false && <section className="z-card z-verse">
+        {data.settings.showDailyVerse !== false && <section className="z-card white z-section z-verse">
           <span className="z-badge brand sm"><BookOpen aria-hidden="true" />Palavra do dia</span>
           <h2 className="t-h1">{verse.reference}</h2>
           <p className="t-body-lg-strong">{verse.theme}</p>

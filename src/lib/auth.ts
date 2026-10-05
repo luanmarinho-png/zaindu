@@ -61,6 +61,8 @@ export const states = (db: Db) => db.collection<StateDoc>('clinic_state');
 export async function ensureDefaultClinic(db: Db): Promise<void> {
   if (await clinics(db).estimatedDocumentCount() > 0) return;
   const state = await states(db).findOne({ _id: 'main' });
+  // Sem o registro antigo não há o que migrar (ex.: todas as clínicas foram apagadas pelo admin).
+  if (!state) return;
   const settings = (state?.data?.settings || {}) as Record<string, unknown>;
   const now = new Date();
   await clinics(db).updateOne(
