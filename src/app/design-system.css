@@ -1,0 +1,65 @@
+/* Design System SC: tokens portados do pacote ds-sc-socialcof (formato CSS puro).
+   As classes .sc-* são primitivas reutilizáveis; a interface da clínica usa os
+   mesmos tokens nos componentes já existentes. */
+:root {
+  /* Tokens-base do DS ajustados à identidade visual Raiz Viva. */
+  --sc-brand: #647055;
+  --sc-brand-hover: #4b513b;
+  --sc-brand-soft: rgba(100, 112, 85, 0.1);
+  --sc-ink: #2e2e2e;
+  --sc-ink-muted: #6d6c63;
+  --sc-surface: #f8f6f1;
+  --sc-card: #fffefa;
+  --sc-border: rgba(75, 81, 59, 0.14);
+  --sc-soft: #efeade;
+  --sc-success: #3f704f;
+  --sc-success-soft: #e4efe5;
+  --sc-danger: #a53e38;
+  --sc-danger-soft: #f5e8e5;
+  --sc-font: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sc-shadow: 0 2px 12px rgba(28, 29, 32, 0.06);
+  --sc-radius-card: 20px;
+  --sc-radius-control: 12px;
+  --sc-motion-fast: 150ms;
+  --sc-motion-standard: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sc-card {
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius-card);
+  background: var(--sc-card);
+  box-shadow: var(--sc-shadow);
+}
+
+.sc-button {
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--sc-radius-control);
+  padding: 0 16px;
+  font: 600 14px/1 var(--sc-font);
+  cursor: pointer;
+  transition: background var(--sc-motion-fast) var(--sc-motion-standard),
+    border-color var(--sc-motion-fast) var(--sc-motion-standard),
+    color var(--sc-motion-fast) var(--sc-motion-standard);
+}
+
+.sc-button-primary {
+  background: var(--sc-brand);
+  color: #fff;
+}
+
+.sc-button-primary:hover { background: var(--sc-brand-hover); }
+
+.sc-input {
+  min-height: 44px;
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius-control);
+  background: var(--sc-card);
+  color: var(--sc-ink);
+  font: 14px var(--sc-font);
+}
+
+:where(.sc-button, .sc-input, a, button, input, select, textarea, [role="button"]):focus-visible {
+  outline: 2px solid var(--sc-brand);
+  outline-offset: 2px;
+}
