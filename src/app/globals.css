@@ -116,3 +116,94 @@ html, body { font-family: var(--sc-font); background: var(--sc-surface); color: 
 /* Tipografia unificada com o Design System SC */
 html, body, button, input, select, textarea { font-family: var(--sc-font); }
 .dailyHighlight{justify-content:flex-start}.dailyHighlight>div{flex:1}.dailyFooter{font-family:var(--sc-font);font-style:normal;font-size:14px}
+
+/* Navegação e conteúdo confortáveis em telas touch */
+.mobileNavBackdrop{display:none}
+@media(max-width:760px){
+  .shell,.shell.sidebarCollapsed{display:block;min-height:100dvh}
+  .sidebar,.sidebarCollapsed .sidebar{position:fixed;inset:0 auto 0 0;width:min(286px,86vw);height:100dvh;min-height:100dvh;padding:24px 16px 18px;display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;background:var(--sc-card);box-shadow:0 16px 44px #17191338;z-index:20;transform:translateX(-105%);transition:transform .22s ease}
+  .shell.mobileNavOpen .sidebar{transform:translateX(0)}
+  .sidebar .brand,.sidebar .workspace,.sidebar .navLabel,.sidebar .sideTip,.sidebar .sidebarFoot{display:flex}
+  .sidebar .navLabel{display:block}
+  .sideNav{display:grid;gap:5px;overflow:visible}
+  .navItem{min-height:46px;height:auto;padding:0 12px;font-size:14px;gap:10px}
+  .navItem .navIcon{font-size:17px}
+  .navCount{display:inline;margin-left:auto}
+  .collapseButton{display:none}
+  .mobileNavBackdrop{display:block;position:fixed;inset:0;width:100%;height:100%;border:0;border-radius:0;background:#191a1670;z-index:19}
+  .mainArea{display:block;min-width:0}
+  .topbar{position:sticky;top:0;z-index:8;height:54px;padding:0 14px;gap:10px;background:#fffefa}
+  .mobileMenu{display:grid;place-items:center;flex:0 0 40px;width:40px;height:40px;border:1px solid var(--line);border-radius:11px;background:#fffefa;font-size:19px;line-height:1;cursor:pointer}
+  .crumb{min-width:0;flex:1;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topActions{gap:6px}
+  .content{width:100%;padding:14px 12px 28px;grid-template-columns:minmax(0,1fr);gap:12px}
+  .content>*{min-width:0;grid-column:1/-1}
+  .pageHeading{position:relative;min-height:164px;padding:55px 16px 15px;border-radius:17px;align-items:flex-end;overflow:hidden}
+  .pageHeading>div:first-child{max-width:100%}
+  .pageHeading h1{font-size:clamp(25px,7vw,32px);line-height:1.08;max-width:100%;overflow-wrap:anywhere}
+  .pageHeading .eyebrow{font-size:8px;letter-spacing:1.6px}
+  .pageHeading .subheading{max-width:100%;font-size:12px;line-height:1.45}
+  .pageHeading .monthControls{right:12px;top:10px;left:12px;justify-content:flex-end}
+  .pageHeading .monthControls input{max-width:38px}
+  .heroActions{display:contents}
+  .heroActions .button{position:absolute;right:13px;bottom:12px;z-index:2;min-height:40px;height:auto;padding:8px 12px;font-size:11px}
+  .month-pill{font-size:10px}
+  .metricGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  .metricCard{min-width:0;padding:13px 11px}
+  .metricCard>strong{font-size:clamp(18px,5vw,23px);overflow-wrap:anywhere}
+  .metricCard small{font-size:10px;line-height:1.35}
+  .panel{min-width:0;padding:15px 13px;border-radius:16px}
+  .panelHeader{align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .panelHeader h2{font-size:20px}
+  .panelHeader p{font-size:11px;line-height:1.45}
+  .panelHeader>.button,.panelHeader>.textButton{flex:none}
+  .tableWrap{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tableWrap table{min-width:680px}
+  .calendarPanel{padding:11px 7px}
+  .calendarWeekdays,.calendarGrid{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .calendarDay{min-width:0;min-height:78px;padding:3px 2px;overflow:hidden}
+  .calendarDayHead{gap:1px}
+  .calendarDayHead>span{width:20px;height:20px;font-size:9px}
+  .calendarDayHead button{width:18px;height:18px;font-size:12px}
+  .calendarEvent{max-width:100%;overflow:hidden;text-overflow:ellipsis}
+  .settingsGrid,.financeForm,.noteGroupFields,.profileFormGrid{grid-template-columns:minmax(0,1fr)}
+  .supplyForm{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .supplyForm input{width:100%;min-width:0}
+  .supplyForm button{grid-column:1/-1;min-height:42px}
+  .supplyRow{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px}
+  .supplyRow>span{grid-column:1/-1}
+  .supplyRow>button{justify-self:end}
+  .knowledgeInput{align-items:flex-start;flex-direction:column}
+  .knowledgeInput input,.supplyRow input{width:100%;max-width:100%}
+  .costChips{gap:6px}
+  .appointmentTimeline article{grid-template-columns:minmax(0,1fr);gap:6px}
+  .profileHeader{align-items:flex-start;gap:10px;flex-wrap:wrap}
+  .profileGrid,.clinicalAlerts{grid-template-columns:minmax(0,1fr)}
+  .noteMeta{grid-template-columns:minmax(0,1fr)}
+  .mediaGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dailyLead{padding:20px 16px}
+  .dailyLead h2{font-size:clamp(24px,7vw,32px);overflow-wrap:anywhere}
+  .dailyLead p{font-size:14px}
+  .dailyVerseGrid{grid-template-columns:minmax(0,1fr)}
+  .bottomCards{grid-template-columns:minmax(0,1fr)}
+  .overlay{align-items:flex-end;padding:0;}
+  .modal{width:100%;max-width:none;max-height:92dvh;overflow-y:auto;border-radius:20px 20px 0 0;padding:17px 14px calc(16px + env(safe-area-inset-bottom))}
+  .modalForm,.profileFormGrid{grid-template-columns:minmax(0,1fr)}
+  .modalForm>label.full,.profileFormGrid .full{grid-column:auto}
+  .modalActions{position:sticky;bottom:-16px;padding:12px 0 max(4px,env(safe-area-inset-bottom));background:var(--white)}
+  .modalForm input,.modalForm select,.noteForm input,.noteForm select,.profileForm input,.profileForm select,.mediaForm input,.mediaForm select,.settingsList form input,.supplyForm input,.supplyRow input{font-size:16px;min-height:42px}
+}
+@media(max-width:420px){
+  .content{padding-inline:9px}
+  .pageHeading{min-height:174px;padding-inline:13px}
+  .pageHeading h1{font-size:25px}
+  .heroActions .button{font-size:10px}
+  .metricGrid{gap:7px}
+  .metricCard{padding:11px 9px}
+  .calendarDay{min-height:68px}
+  .calendarEvent{padding:3px 1px}
+  .calendarLegend{flex-wrap:wrap}
+  .mediaGrid{grid-template-columns:minmax(0,1fr)}
+  .modalActions{gap:8px}
+  .modalActions .button{flex:1;justify-content:center;padding-inline:8px}
+}
