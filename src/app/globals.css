@@ -270,7 +270,7 @@ html, body, button, input, select, textarea { font-family: var(--sc-font); }
 .accessForm input:focus{outline:none;border-color:var(--sc-brand);box-shadow:0 0 0 3px var(--sc-brand-soft)}
 .accessForm input[aria-invalid="true"]{border-color:var(--sc-danger)}
 .accessError{margin:-4px 0 0;padding:10px 12px;border-radius:10px;background:var(--sc-danger-soft);color:var(--sc-danger);font-size:13px}
-.accessSubmit{width:100%;min-height:48px;margin-top:6px;border-radius:12px;font-size:15px}
+.accessSubmit{width:100%;justify-content:center;min-height:48px;margin-top:6px;border-radius:12px;font-size:15px}
 .accessSubmit:disabled{opacity:.7;cursor:progress}
 .accessSubmit:focus-visible{outline:2px solid var(--sc-brand);outline-offset:3px}
 .accessLoader{display:block;width:100%;height:3px;border-radius:3px;background:linear-gradient(90deg,transparent,var(--sc-brand),transparent) 0 0/40% 100% no-repeat,var(--sc-soft);animation:accessLoad 1.2s ease-in-out infinite}

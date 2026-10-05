@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic';
 const MAX_BODY_BYTES = 200_000;
 
 type FormAnswer = { secao: string; numero: number; pergunta: string; resposta: string };
-type FormResponse = { _id: string; formulario: string; respostas: FormAnswer[]; texto: string; enviadoEm: Date; createdAt: Date; updatedAt: Date };
+type FormFile = { id: string; nome: string; tamanho: number; tipo: string; pergunta: number };
+type FormResponse = { _id: string; formulario: string; respostas: FormAnswer[]; anexos: FormFile[]; texto: string; enviadoEm: Date; createdAt: Date; updatedAt: Date };
 
 export async function POST(request: NextRequest) {
   const raw = await request.text();
@@ -24,6 +25,10 @@ export async function POST(request: NextRequest) {
     const answer = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
     return { secao: String(answer.secao || ''), numero: Number(answer.numero) || 0, pergunta: String(answer.pergunta || ''), resposta: String(answer.resposta || '') };
   });
+  const anexos: FormFile[] = (Array.isArray(body.anexos) ? body.anexos : []).slice(0, 30).map(item => {
+    const file = (item && typeof item === 'object' ? item : {}) as Record<string, unknown>;
+    return { id: String(file.id || '').slice(0, 24), nome: String(file.nome || '').slice(0, 180), tamanho: Number(file.tamanho) || 0, tipo: String(file.tipo || '').slice(0, 80), pergunta: Number(file.pergunta) || 0 };
+  }).filter(file => /^[a-f\d]{24}$/i.test(file.id));
   const enviadoEm = new Date(String(body.enviado_em || ''));
 
   try {
@@ -32,7 +37,7 @@ export async function POST(request: NextRequest) {
     await database.collection<FormResponse>('form_responses').updateOne(
       { _id: id },
       {
-        $set: { formulario, respostas, texto: String(body.texto || ''), enviadoEm: Number.isNaN(enviadoEm.getTime()) ? now : enviadoEm, updatedAt: now },
+        $set: { formulario, respostas, anexos, texto: String(body.texto || ''), enviadoEm: Number.isNaN(enviadoEm.getTime()) ? now : enviadoEm, updatedAt: now },
         $setOnInsert: { createdAt: now },
       },
       { upsert: true },

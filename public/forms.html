@@ -140,6 +140,28 @@ textarea:focus, input[type="text"]:focus { outline: none; border-color: var(--sc
 .q-error { display: flex; align-items: center; gap: 6px; margin: 10px 0 0 32px; font-size: 13px; font-weight: 500; color: var(--sc-brand); }
 .q-error[hidden] { display: none; }
 .q.invalid textarea, .q.invalid input[type="text"]:not(.extra), .q.invalid .chip span { border-color: var(--sc-brand); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 6px 4px 4px; border: 1px solid var(--sc-border-strong); border-radius: var(--sc-radius-pill); background: var(--sc-card); }
+.swatch input[type="color"] { width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.swatch input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch input[type="color"]::-webkit-color-swatch { border: 1px solid var(--sc-border-strong); border-radius: 50%; }
+.swatch input[type="color"]::-moz-color-swatch { border: 1px solid var(--sc-border-strong); border-radius: 50%; }
+.swatch-hex { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; min-width: 68px; }
+.icon-btn { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: var(--sc-ink-muted); cursor: pointer; font: inherit; font-size: 18px; line-height: 1; }
+.icon-btn:hover { background: var(--sc-hover); color: var(--sc-ink); }
+.icon-btn:focus-visible { outline: 2px solid var(--sc-ink-muted); outline-offset: 2px; }
+.add-color { min-height: 48px; padding: 0 18px; border: 1px dashed var(--sc-border-strong); border-radius: var(--sc-radius-pill); background: transparent; color: var(--sc-ink); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.add-color:hover { background: var(--sc-hover); }
+.files { margin-top: 12px; }
+.file-pick { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 1px solid var(--sc-border-strong); border-radius: var(--sc-radius-pill); font-size: 14px; font-weight: 500; cursor: pointer; }
+.file-pick:hover { background: var(--sc-hover); }
+.file-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-pick:focus-within { outline: 2px solid var(--sc-ink-muted); outline-offset: 2px; }
+.file-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.file-list li { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; background: var(--sc-muted); border-radius: 12px; font-size: 14px; }
+.file-list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-list .meta { color: var(--sc-ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.file-error { color: var(--sc-brand); font-size: 13px; margin: 8px 0 0; }
 .limit-note { font-size: 12px; color: var(--sc-ink-muted); margin-top: 8px; font-variant-numeric: tabular-nums; }
 
 .actions { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-top: 32px; flex-wrap: wrap; }
@@ -218,7 +240,7 @@ const CONFIG = {
   whatsapp: '',
 };
 
-const STORAGE_KEY = 'questionario-dra-celina-v2';
+const STORAGE_KEY = 'questionario-dra-celina-v3';
 
 const AREAS = ['Pele no dia a dia (acne, manchas, alergias)', 'Estética e rejuvenescimento', 'Cabelo e couro cabeludo', 'Unhas', 'Pequenas cirurgias de pele', 'Prevenção e check-up de pintas'];
 
@@ -241,10 +263,10 @@ const SECTIONS = [
     { id: 'q11', type: 'multi', label: 'Como as pessoas chegam até você hoje?', options: ['Indicação', 'Instagram', 'Google', 'Convênio', 'Plataformas de agendamento'], extra: 'Outro caminho' },
   ]},
   { title: 'Sua marca', intro: 'Aqui começa a identidade visual.', questions: [
-    { id: 'q12', type: 'single', label: 'Você já tem logo, cores ou algum material visual?', hint: 'Se tiver os arquivos, cole um link ou mande depois pelo WhatsApp.', options: ['Tenho e quero manter', 'Tenho, mas quero mudar', 'Ainda não tenho'], extra: 'Link dos arquivos (opcional)' },
+    { id: 'q12', type: 'single', label: 'Você já tem logo, cores ou algum material visual?', hint: 'Se tiver os arquivos, anexe aqui ou cole um link.', files: true, options: ['Tenho e quero manter', 'Tenho, mas quero mudar', 'Ainda não tenho'], extra: 'Link dos arquivos (opcional)' },
     { id: 'q13', type: 'multi', max: 3, label: 'Escolha até três palavras para como você quer que o paciente se sinta ao conhecer sua marca.', options: ['Acolhido', 'Seguro', 'Leve', 'Cuidado', 'Confiante', 'Bem informado', 'À vontade', 'Especial'] },
     { id: 'q14', type: 'multi', max: 3, label: 'E até três que você não quer de jeito nenhum.', options: ['Frio', 'Artificial', 'Exagerado', 'Distante', 'Comercial demais', 'Infantil', 'Sério demais'] },
-    { id: 'q15', type: 'multi', max: 3, label: 'Quais tons combinam com você?', hint: 'Escolha até três.', options: ['Neutros e areia', 'Terrosos', 'Verdes', 'Rosados e nude', 'Azuis', 'Preto e branco', 'Dourado'], extra: 'Alguma cor que você não quer?' },
+    { id: 'q15', type: 'colors', max: 3, label: 'Quais cores combinam com você?', hint: 'Escolha até três no seletor de cores.', extra: 'Alguma cor que você não quer?' },
     { id: 'q16', type: 'single', label: 'Qual estilo te atrai mais?', options: ['Minimalista e clean', 'Elegante e sofisticado', 'Natural e orgânico', 'Moderno e marcante', 'Delicado'], extra: 'Links de referência (opcional)' },
     { id: 'q17', type: 'single', label: 'Como você imagina sua logo?', options: ['Só o nome escrito', 'Nome com um símbolo', 'Iniciais (monograma)', 'Não sei, quero sugestões'], extra: 'Símbolo especial (opcional)' },
   ]},
@@ -309,6 +331,7 @@ function answerText(q) {
   const picked = q.type === 'single' ? (a.value ? [a.value] : []) : (a.values || []);
   const parts = picked.length ? [picked.join(', ')] : [];
   if (a.extra && a.extra.trim()) parts.push(a.extra.trim());
+  if (a.files && a.files.length) parts.push('Anexos: ' + a.files.map(f => f.name).join(', '));
   return parts.join('\n');
 }
 
@@ -383,6 +406,15 @@ function fieldHTML(q) {
     body = `<textarea id="${q.id}" data-q="${q.id}" aria-labelledby="${labelId}" placeholder="Escreva aqui">${esc(a.value || '')}</textarea>`;
   } else if (q.type === 'text') {
     body = `<input type="text" id="${q.id}" data-q="${q.id}" aria-labelledby="${labelId}" placeholder="${esc(q.placeholder || 'Escreva aqui')}" value="${esc(a.value || '')}">`;
+  } else if (q.type === 'colors') {
+    const colors = a.values || [];
+    body = `<div class="swatches" role="group" aria-labelledby="${labelId}">` + colors.map((c, i) => `<span class="swatch">
+        <input type="color" data-color="${q.id}" data-i="${i}" value="${esc(c)}" aria-label="Cor ${i + 1}">
+        <span class="swatch-hex" id="${q.id}-hex-${i}">${esc(c.toUpperCase())}</span>
+        <button type="button" class="icon-btn" data-rmcolor="${q.id}" data-i="${i}" aria-label="Remover cor ${i + 1}">×</button>
+      </span>`).join('') + (colors.length < q.max ? `<button type="button" class="add-color" data-addcolor="${q.id}">${colors.length ? 'Adicionar outra cor' : 'Escolher cor'}</button>` : '') + '</div>';
+    body += `<p class="limit-note">${colors.length} de ${q.max} cores</p>`;
+    if (q.extra) body += `<input type="text" class="extra" data-extra="${q.id}" aria-label="${esc(q.extra)}" placeholder="${esc(q.extra)}" value="${esc(a.extra || '')}">`;
   } else {
     const isSingle = q.type === 'single';
     const picked = isSingle ? [a.value] : (a.values || []);
@@ -394,12 +426,78 @@ function fieldHTML(q) {
     if (q.max) body += `<p class="limit-note" id="${q.id}-limit">${picked.length} de ${q.max} escolhidas</p>`;
     if (q.extra) body += `<input type="text" class="extra" data-extra="${q.id}" aria-label="${esc(q.extra)}" placeholder="${esc(q.extra)}" value="${esc(a.extra || '')}">`;
   }
+  if (q.files) body += `<div class="files">
+      <label class="file-pick">Anexar arquivos<input type="file" multiple accept="image/*,application/pdf,.ai,.eps" data-file="${q.id}"></label>
+      <ul class="file-list" id="${q.id}-files">${fileItems(q.id)}</ul>
+      <p class="limit-note">Imagens ou PDF, até 4 MB cada.</p>
+      <p class="file-error" id="${q.id}-file-err" role="alert" hidden></p>
+    </div>`;
   return `<div class="q" data-wrap="${q.id}">
     <div class="q-label" id="${labelId}"><span class="q-num">${n}.</span><span>${esc(q.label)}</span></div>
     ${q.hint ? `<p class="q-hint">${esc(q.hint)}</p>` : '<div style="height:8px"></div>'}
     <div class="q-body">${body}</div>
     <p class="q-error" id="${q.id}-err" role="alert" hidden>Responda esta pergunta para continuar.</p>
   </div>`;
+}
+
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
+const uploading = {};
+
+function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+
+function fileItems(id) {
+  const files = (state.answers[id] && state.answers[id].files) || [];
+  const busy = uploading[id] || [];
+  return files.map((f, i) => `<li><span class="name">${esc(f.name)}</span><span class="meta">${fmtSize(f.size)}</span><button type="button" class="icon-btn" data-rmfile="${id}" data-i="${i}" aria-label="Remover ${esc(f.name)}">×</button></li>`).join('')
+    + busy.map(name => `<li><span class="name">${esc(name)}</span><span class="meta">Enviando…</span></li>`).join('');
+}
+
+function refreshFiles(id) {
+  const list = document.getElementById(`${id}-files`);
+  if (list) list.innerHTML = fileItems(id);
+}
+
+function fileError(id, msg) {
+  const el = document.getElementById(`${id}-file-err`);
+  if (!el) return;
+  el.textContent = msg || '';
+  el.hidden = !msg;
+}
+
+async function uploadFiles(id, fileList) {
+  fileError(id, '');
+  const a = state.answers[id] = state.answers[id] || {};
+  a.files = a.files || [];
+  for (const file of fileList) {
+    if (file.size > MAX_FILE_BYTES) { fileError(id, `${file.name} passa de 4 MB. Envie uma versão menor ou cole um link.`); continue; }
+    uploading[id] = (uploading[id] || []).concat(file.name);
+    refreshFiles(id);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('formId', state.id);
+      body.append('question', id);
+      const res = await fetch('/api/forms/files', { method: 'POST', body });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || 'Não foi possível enviar o arquivo.');
+      a.files.push({ id: out.id, name: out.name, size: out.size, type: out.type });
+      save(); setProgress(); clearMissing(id);
+    } catch (err) {
+      fileError(id, `${file.name}: ${err.message}`);
+    } finally {
+      uploading[id].splice(uploading[id].indexOf(file.name), 1);
+      refreshFiles(id);
+    }
+  }
+}
+
+async function removeFile(id, i) {
+  const a = state.answers[id];
+  const f = a && a.files && a.files[i];
+  if (!f) return;
+  a.files.splice(i, 1);
+  save(); setProgress(); refreshFiles(id);
+  try { await fetch(`/api/forms/files/${encodeURIComponent(f.id)}?form=${encodeURIComponent(state.id)}`, { method: 'DELETE' }); } catch (_) {}
 }
 
 function renderSection(i) {
@@ -429,6 +527,13 @@ function bindInputs(s) {
   const form = document.getElementById('form');
   form.addEventListener('input', e => {
     const t = e.target;
+    if (t.dataset.color) {
+      const id = t.dataset.color;
+      state.answers[id].values[Number(t.dataset.i)] = t.value;
+      document.getElementById(`${id}-hex-${t.dataset.i}`).textContent = t.value.toUpperCase();
+      save();
+      return;
+    }
     if (t.dataset.q) {
       state.answers[t.dataset.q] = Object.assign(state.answers[t.dataset.q] || {}, { value: t.value });
     } else if (t.dataset.extra) {
@@ -437,8 +542,26 @@ function bindInputs(s) {
     clearMissing(t.dataset.q || t.dataset.extra);
     save(); setProgress();
   });
+  form.addEventListener('click', e => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.dataset.addcolor) {
+      const id = t.dataset.addcolor;
+      const a = state.answers[id] = state.answers[id] || {};
+      a.values = (a.values || []).concat(['#C8B8A6']);
+      save(); clearMissing(id); rerenderQuestion(s, id, true);
+    } else if (t.dataset.rmcolor) {
+      const id = t.dataset.rmcolor;
+      state.answers[id].values.splice(Number(t.dataset.i), 1);
+      save(); setProgress(); rerenderQuestion(s, id, false);
+    } else if (t.dataset.rmfile) {
+      removeFile(t.dataset.rmfile, Number(t.dataset.i));
+    }
+  });
   form.addEventListener('change', e => {
     const t = e.target;
+    if (t.dataset.file) { uploadFiles(t.dataset.file, [...t.files]); t.value = ''; return; }
+    if (t.dataset.color) { setProgress(); return; }
     const id = t.dataset.opt;
     if (!id) return;
     const q = s.questions.find(x => x.id === id);
@@ -472,6 +595,18 @@ function bindInputs(s) {
     });
     if (r.checked) r.dataset.wasChecked = '1';
   });
+}
+
+function rerenderQuestion(s, id, openPicker) {
+  const q = s.questions.find(x => x.id === id);
+  const wrap = document.querySelector(`[data-wrap="${id}"]`);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = fieldHTML(q);
+  wrap.replaceWith(tmp.firstElementChild);
+  setProgress();
+  const inputs = document.querySelectorAll(`input[data-color="${id}"]`);
+  if (openPicker && inputs.length) { const last = inputs[inputs.length - 1]; last.focus(); try { last.showPicker(); } catch (_) { last.click(); } }
+  else { const add = document.querySelector(`[data-addcolor="${id}"]`); if (add) add.focus(); }
 }
 
 function missingIn(s) {
@@ -513,6 +648,9 @@ function asJSON() {
     enviado_em: new Date().toISOString(),
     respostas: SECTIONS.flatMap(s => s.questions.map(q => ({
       secao: s.title, numero: numberOf(q.id), pergunta: q.label, resposta: answerText(q),
+    }))),
+    anexos: SECTIONS.flatMap(s => s.questions).flatMap(q => ((state.answers[q.id] && state.answers[q.id].files) || []).map(f => ({
+      id: f.id, nome: f.name, tamanho: f.size, tipo: f.type, pergunta: numberOf(q.id),
     }))),
   };
 }
