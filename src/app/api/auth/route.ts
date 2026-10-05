@@ -1,35 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { clinicPassword, clinicSessionToken, clinicUsername, CLINIC_SESSION_COOKIE, hasClinicSession, safeSecretEqual } from '@/lib/auth';
+import { hasClinicSession } from '@/lib/auth';
+import { createClient, supabaseConfigured } from '@/lib/supabase/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(request: NextRequest) {
-  const configured = Boolean(clinicUsername() && clinicPassword());
-  return NextResponse.json({ configured, authenticated: configured && hasClinicSession(request) }, { headers: { 'Cache-Control': 'no-store' } });
+export async function GET() {
+  const configured = supabaseConfigured();
+  return NextResponse.json({ configured, authenticated: configured && await hasClinicSession() }, { headers: { 'Cache-Control': 'no-store' } });
 }
 
 export async function POST(request: NextRequest) {
-  const username = clinicUsername();
-  const password = clinicPassword();
-  if (!username || !password) return NextResponse.json({ error: 'Configure CLINIC_ACCESS_USERNAME e CLINIC_ACCESS_PASSWORD para liberar o acesso.' }, { status: 503 });
-  let submittedUsername = '';
-  let submittedPassword = '';
+  if (!supabaseConfigured()) return NextResponse.json({ error: 'Configure NEXT_PUBLIC_SUPABASE_URL e NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY para liberar o acesso.' }, { status: 503 });
+  let email = '';
+  let password = '';
   try {
     const body = await request.json();
-    submittedUsername = String(body.username || '').trim();
-    submittedPassword = String(body.password || '');
-  } catch { return NextResponse.json({ error: 'Informe usuário e senha.' }, { status: 400 }); }
-  if (!safeSecretEqual(submittedUsername, username) || !safeSecretEqual(submittedPassword, password)) return NextResponse.json({ error: 'Usuário ou senha incorretos.' }, { status: 401 });
-  const token = clinicSessionToken();
-  if (!token) return NextResponse.json({ error: 'A sessão não pôde ser iniciada.' }, { status: 503 });
-  const response = NextResponse.json({ authenticated: true });
-  response.cookies.set(CLINIC_SESSION_COOKIE, token, { httpOnly: true, secure: request.nextUrl.protocol === 'https:', sameSite: 'strict', path: '/', maxAge: 60 * 60 * 12 });
-  return response;
+    email = String(body.email || '').trim();
+    password = String(body.password || '');
+  } catch { return NextResponse.json({ error: 'Informe e-mail e senha.' }, { status: 400 }); }
+  if (!email || !password) return NextResponse.json({ error: 'Informe e-mail e senha.' }, { status: 400 });
+  const supabase = await createClient();
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) return NextResponse.json({ error: 'E-mail ou senha incorretos.' }, { status: 401 });
+  return NextResponse.json({ authenticated: true });
 }
 
 export async function DELETE() {
-  const response = NextResponse.json({ authenticated: false });
-  response.cookies.set(CLINIC_SESSION_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', path: '/', maxAge: 0 });
-  return response;
+  if (supabaseConfigured()) await (await createClient()).auth.signOut();
+  return NextResponse.json({ authenticated: false });
 }

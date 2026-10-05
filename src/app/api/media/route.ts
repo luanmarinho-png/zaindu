@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
-  if (!hasClinicSession(request)) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
+  if (!(await hasClinicSession())) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   try {
     const form = await request.formData();
     const file = form.get('image');

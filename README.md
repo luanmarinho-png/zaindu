@@ -22,6 +22,7 @@ Abra http://localhost:3000. O script já fixa a porta 3000. Como a instalação 
 - Registro descritivo de tricoscopia por região, aparelho/aumento, métricas e referência fotográfica.
 - Visão mensal de consultas, pacientes e receita realizada.
 - Campos editáveis de custos fixos e parcelas/investimentos.
+- Formulário público em `/forms`; as respostas ficam na coleção `form_responses` do MongoDB.
 - Persistência da ficha, agenda e evoluções no MongoDB; imagens privadas no GridFS.
 - Preferência individual de comunicação, identidade e especialidade configuráveis por clínica.
 - Fundação visual do Design System SC, com tipografia e componentes universais para diferentes especialidades.
@@ -31,8 +32,8 @@ O Design System está em `src/app/design-system.css`, importado antes dos estilo
 
 ## Próximos passos sugeridos
 
-1. Configure `MONGODB_URI`, `MONGODB_DB`, `CLINIC_ACCESS_USERNAME` e `CLINIC_ACCESS_PASSWORD` nos ambientes local e Vercel. Use segredos fortes e nunca os envie ao GitHub.
-2. MongoDB guarda os dados da clínica; GridFS guarda fotos privadas, fora dos documentos clínicos. A sessão é protegida por senha e cookie HttpOnly.
+1. Configure `MONGODB_URI`, `MONGODB_DB`, `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` nos ambientes local e Vercel. Crie os usuários da clínica em Supabase → Authentication → Users. Nunca envie segredos ao GitHub.
+2. MongoDB guarda os dados da clínica; GridFS guarda fotos privadas, fora dos documentos clínicos. O login usa Supabase Auth (e-mail e senha), com sessão em cookie renovada pelo middleware.
 3. Antes de uso real, configure backups, retenção, perfis de acesso e demais controles de privacidade aplicáveis à operação médica.
 
 O banco começa sem pacientes nem consultas de demonstração. A primeira abertura, após configurar o acesso e o MongoDB, migra eventuais registros locais existentes, removendo exemplos de demonstração e preservando os cadastros reais.

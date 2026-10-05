@@ -8,7 +8,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  if (!hasClinicSession(request)) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
+  if (!(await hasClinicSession())) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   try {
     const { id } = await context.params;
     if (!ObjectId.isValid(id)) return NextResponse.json({ error: 'Imagem não encontrada.' }, { status: 404 });
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 }
 
 export async function DELETE(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  if (!hasClinicSession(request)) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
+  if (!(await hasClinicSession())) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   try {
     const { id } = await context.params;
     if (!ObjectId.isValid(id)) return NextResponse.json({ error: 'Imagem não encontrada.' }, { status: 404 });

@@ -23,7 +23,7 @@ function cleanStore(value: Record<string, unknown>) {
 }
 
 export async function GET(request: NextRequest) {
-  if (!hasClinicSession(request)) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
+  if (!(await hasClinicSession())) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   try {
     const database = await getDatabase();
     const collection = database.collection<{ _id: string; data: Record<string, unknown>; updatedAt?: Date }>('clinic_state');
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  if (!hasClinicSession(request)) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
+  if (!(await hasClinicSession())) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   try {
     const payload = await request.json();
     if (!payload?.data || typeof payload.data !== 'object') return NextResponse.json({ error: 'Os dados da clínica estão incompletos.' }, { status: 400 });
