@@ -1,14 +1,15 @@
 import { GridFSBucket, ObjectId } from 'mongodb';
 import { Readable } from 'node:stream';
 import { NextRequest, NextResponse } from 'next/server';
-import { hasClinicSession } from '@/lib/auth';
+import { getAccess } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
-  if (!(await hasClinicSession())) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
+  // Anexos do questionário de implantação: só o admin da plataforma baixa.
+  if ((await getAccess().catch(() => null))?.role !== 'admin') return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   try {
     const { id } = await context.params;
     if (!ObjectId.isValid(id)) return NextResponse.json({ error: 'Arquivo não encontrado.' }, { status: 404 });

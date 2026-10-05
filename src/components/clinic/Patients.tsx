@@ -12,7 +12,7 @@ type Props = {
   data: Store;
   onNew: () => void;
   onEdit: (patient: Patient) => void;
-  onOpenRecord: (patientId: string) => void;
+  onOpenRecord?: (patientId: string) => void;
 };
 
 export function Patients({ data, onNew, onEdit, onOpenRecord }: Props) {
@@ -56,7 +56,7 @@ export function Patients({ data, onNew, onEdit, onOpenRecord }: Props) {
                   <div className="z-row-actions">
                     {patient.phone && <a className="z-close" href={`https://wa.me/55${patient.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp de ${patient.name}`} title="WhatsApp"><Phone /></a>}
                     <button type="button" className="z-close" onClick={() => onEdit(patient)} aria-label={`Editar ${patient.name}`} title="Editar"><Pencil /></button>
-                    <button type="button" className="z-btn secondary sm" onClick={() => onOpenRecord(patient.id)}><ClipboardList />Prontuário</button>
+                    {onOpenRecord && <button type="button" className="z-btn secondary sm" onClick={() => onOpenRecord(patient.id)}><ClipboardList />Prontuário</button>}
                   </div>
                 </li>
               );

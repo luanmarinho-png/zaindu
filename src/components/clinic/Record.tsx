@@ -5,18 +5,21 @@ import { Camera, CalendarPlus, ClipboardList, FilePlus2, HeartPulse, ImagePlus, 
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { ageFrom, formatDate } from '@/lib/clinic/format';
-import { communicationStyles, emptyProfile, makeId, noteGroups, profileFields, type Appointment, type ClinicalNote, type MediaAttachment, type Patient, type PatientProfile, type Store } from '@/lib/clinic/store';
+import { emptyProfile, makeId, type Appointment, type ClinicalNote, type MediaAttachment, type Patient, type PatientProfile, type Store } from '@/lib/clinic/store';
+import { allNoteFields, type TemplateField, type TemplateId } from '@/lib/clinic/templates';
 import { PatientPicker, StatusBadge } from './common';
 import { PageHeader } from './Shell';
 import type { ClinicProps } from './types';
 
-const MEDIA_KIND: Record<MediaAttachment['kind'], string> = { patient: 'Paciente', before: 'Antes', after: 'Depois', trichoscopy: 'Tricoscopia' };
+// A categoria "trichoscopy" guarda o exame com aumento de cada especialidade.
+const SCOPE_LABEL: Record<TemplateId, string> = { tricologia: 'Tricoscopia', dermatologia: 'Dermatoscopia', geral: 'Exame' };
+const mediaKinds = (template: TemplateId): Record<MediaAttachment['kind'], string> => ({ patient: 'Paciente', before: 'Antes', after: 'Depois', trichoscopy: SCOPE_LABEL[template] });
 
 type Props = ClinicProps & {
   patientId: string;
   onSelectPatient: (id: string) => void;
-  onEditPatient: (patient: Patient) => void;
-  onNewAppointment: (patientId: string) => void;
+  onEditPatient?: (patient: Patient) => void;
+  onNewAppointment?: (patientId: string) => void;
   onError: (message: string) => void;
 };
 
@@ -30,7 +33,10 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
   const media = data.media.filter(item => item.patientId === patientId).sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
   const appointments = data.appointments.filter(item => item.patientId === patientId).sort((a, b) => b.date.localeCompare(a.date) || b.time.localeCompare(a.time));
   const portrait = media.find(item => item.kind === 'patient');
-  const age = patient ? ageFrom(patient.birthDate || profile.birthDate) : null;
+  const age = patient ? ageFrom(patient.birthDate || profile.birthDate || '') : null;
+  const record = data.settings.record;
+  const anamnesis = record.anamnesis.filter(field => hasValue(profile[field.key]));
+  const MEDIA_KIND = mediaKinds(record.template);
 
   async function removeMedia(item: MediaAttachment) {
     try {
@@ -65,8 +71,8 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
               <span className="t-body t-muted num">{appointments.length} atendimento(s) · {notes.length} evolução(ões) · {media.length} imagem(ns)</span>
             </div>
             <div className="z-row-actions">
-              <button type="button" className="z-btn secondary sm" onClick={() => onEditPatient(patient)}><UserPen />Cadastro</button>
-              <button type="button" className="z-btn secondary sm" onClick={() => onNewAppointment(patient.id)}><CalendarPlus />Agendar</button>
+              {onEditPatient && <button type="button" className="z-btn secondary sm" onClick={() => onEditPatient(patient)}><UserPen />Cadastro</button>}
+              {onNewAppointment && <button type="button" className="z-btn secondary sm" onClick={() => onNewAppointment(patient.id)}><CalendarPlus />Agendar</button>}
             </div>
           </div>
         )}
@@ -74,10 +80,10 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
 
       {patient && <>
         <div className="z-alerts">
-          <Alert icon={TriangleAlert} label="Alergias" value={profile.allergies} empty="Não informado, confirmar" warn={Boolean(profile.allergies)} />
-          <Alert icon={HeartPulse} label="Comorbidades" value={profile.comorbidities} empty="Não informado" />
-          <Alert icon={Pill} label="Medicamentos em uso" value={profile.medications} empty="Não informado" />
-          <Alert icon={MessageCircleHeart} label="Como prefere conversar" value={profile.communicationStyle} empty="Não informado" />
+          <Alert icon={TriangleAlert} label="Alergias" value={profile.allergies || ''} empty="Não informado, confirmar" warn={Boolean(profile.allergies)} />
+          <Alert icon={HeartPulse} label="Comorbidades" value={profile.comorbidities || ''} empty="Não informado" />
+          <Alert icon={Pill} label="Medicamentos em uso" value={profile.medications || ''} empty="Não informado" />
+          <Alert icon={MessageCircleHeart} label="Como prefere conversar" value={profile.communicationStyle || ''} empty="Não informado" />
         </div>
 
         <section className="z-card white z-section">
@@ -85,9 +91,9 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
             <div><h2 className="t-h1">Anamnese</h2><p className="t-body t-muted">Histórico de saúde, editável ao longo do acompanhamento.</p></div>
             <button type="button" className="z-btn secondary" onClick={() => setProfileModal(true)}>Editar anamnese</button>
           </header>
-          {profileFields.some(([key]) => profile[key]) ? (
+          {anamnesis.length ? (
             <dl className="z-deflist">
-              {profileFields.filter(([key]) => profile[key]).map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{key === 'birthDate' ? formatDate(profile[key]) : profile[key]}</dd></div>)}
+              {anamnesis.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{display(field, profile[field.key])}</dd></div>)}
             </dl>
           ) : <div className="z-empty"><span>Anamnese ainda não preenchida.</span></div>}
         </section>
@@ -125,7 +131,7 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
                     <div className="z-timeline-date num"><b>{formatDate(item.date, { day: '2-digit', month: 'short', year: 'numeric' })}</b><small>{item.time} · {item.type}</small></div>
                     <div className="z-timeline-body">
                       <StatusBadge status={item.status} small />
-                      <p className="t-body t-muted">{note ? note.assessment || note.report || note.reason || 'Evolução registrada' : 'Sem evolução registrada'}</p>
+                      <p className="t-body t-muted">{note ? noteSummary(note, record.sections.flatMap(section => section.fields)) : 'Sem evolução registrada'}</p>
                     </div>
                     <button type="button" className="z-btn ghost sm" onClick={() => setNoteModal({ note, appointmentId: item.id })}>{note ? 'Abrir evolução' : 'Registrar evolução'}</button>
                   </li>
@@ -146,12 +152,12 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
                   </div>
                   <button type="button" className="z-btn ghost sm" onClick={() => setNoteModal({ note, appointmentId: note.appointmentId })}>Editar</button>
                 </header>
-                {noteGroups.map(group => {
-                  const fields = group.fields.filter(([key]) => note[key]);
+                {record.sections.map(section => {
+                  const fields = section.fields.filter(field => hasValue(note[field.key]));
                   return fields.length ? (
-                    <div key={group.title} className="z-note-group">
-                      <h4 className="t-body-strong t-muted">{group.title}</h4>
-                      <dl className="z-deflist">{fields.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{note[key]}</dd></div>)}</dl>
+                    <div key={section.id} className="z-note-group">
+                      <h4 className="t-body-strong t-muted">{section.title}</h4>
+                      <dl className="z-deflist">{fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{display(field, note[field.key])}</dd></div>)}</dl>
                     </div>
                   ) : null;
                 })}
@@ -174,13 +180,56 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
         />
       )}
       {profileModal && patient && (
-        <ProfileModal profile={profile} onClose={() => setProfileModal(false)} onSave={next => { setData(current => ({ ...current, profiles: { ...current.profiles, [patient.id]: next } })); setProfileModal(false); }} />
+        <ProfileModal fields={record.anamnesis} profile={profile} onClose={() => setProfileModal(false)} onSave={next => { setData(current => ({ ...current, profiles: { ...current.profiles, [patient.id]: next } })); setProfileModal(false); }} />
       )}
       {mediaModal && patient && (
-        <MediaModal appointments={appointments} patientId={patient.id} onClose={() => setMediaModal(false)} onError={onError} onSaved={item => { setData(current => ({ ...current, media: [item, ...current.media] })); setMediaModal(false); }} />
+        <MediaModal kinds={MEDIA_KIND} appointments={appointments} patientId={patient.id} onClose={() => setMediaModal(false)} onError={onError} onSaved={item => { setData(current => ({ ...current, media: [item, ...current.media] })); setMediaModal(false); }} />
       )}
     </>
   );
+}
+
+const hasValue = (value: unknown) => Array.isArray(value) ? value.length > 0 : Boolean(value);
+
+function display(field: TemplateField, value: unknown): string {
+  if (Array.isArray(value)) return value.join(', ');
+  return field.type === 'date' ? formatDate(String(value)) : String(value ?? '');
+}
+
+// Resumo da evolução na linha do tempo: a avaliação, se houver; senão o primeiro texto preenchido.
+function noteSummary(note: ClinicalNote, fields: TemplateField[]): string {
+  const preferred = ['assessment', 'report', 'reason'].map(key => note[key]).find(value => typeof value === 'string' && value);
+  const first = fields.map(field => note[field.key]).find(value => typeof value === 'string' && value);
+  return String(preferred || first || 'Evolução registrada');
+}
+
+// Um campo do modelo de prontuário. Checklist grava lista; os demais gravam texto.
+export function TemplateInput({ field, prefix, value }: { field: TemplateField; prefix: string; value: unknown }) {
+  const id = `${prefix}-${field.key}`;
+  const text = Array.isArray(value) ? value.join(', ') : String(value ?? '');
+  if (field.type === 'checklist') {
+    const checked = Array.isArray(value) ? value : [];
+    return (
+      <fieldset className="z-field full z-checkfield">
+        <legend className="z-label">{field.label}</legend>
+        <div className="z-checkgrid">
+          {(field.options || []).map(option => <label key={option} className="z-check"><input type="checkbox" name={field.key} value={option} defaultChecked={checked.includes(option)} /><span>{option}</span></label>)}
+        </div>
+      </fieldset>
+    );
+  }
+  return (
+    <Field label={field.label || 'Campo sem nome'} htmlFor={id} full={field.wide || (field.type === 'textarea' && prefix === 'a')}>
+      {field.type === 'date' ? <input id={id} name={field.key} className="z-input" type="date" defaultValue={text} />
+        : field.type === 'select' ? <select id={id} name={field.key} className="z-select" defaultValue={text}><option value="">Não informado</option>{(field.options || []).map(option => <option key={option}>{option}</option>)}</select>
+        : field.type === 'text' ? <input id={id} name={field.key} className="z-input" placeholder={field.placeholder} defaultValue={text} />
+        : <textarea id={id} name={field.key} className="z-textarea" rows={field.wide ? 4 : 2} placeholder={field.placeholder} defaultValue={text} />}
+    </Field>
+  );
+}
+
+function readFields(form: FormData, fields: TemplateField[]) {
+  return Object.fromEntries(fields.map(field => [field.key, field.type === 'checklist' ? form.getAll(field.key).map(String) : String(form.get(field.key) || '').trim()]));
 }
 
 function Alert({ icon: Icon, label, value, empty, warn }: { icon: typeof Pill; label: string; value: string; empty: string; warn?: boolean }) {
@@ -201,9 +250,9 @@ function NoteModal({ data, patient, note, appointmentId, onClose, onSave, onDele
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const values = Object.fromEntries(noteGroups.flatMap(group => group.fields).map(([key]) => [key, String(form.get(key) || '').trim()]));
     onSave({
-      ...(values as Omit<ClinicalNote, 'id' | 'patientId' | 'appointmentId' | 'date' | 'selectedFindings'>),
+      ...note,
+      ...readFields(form, allNoteFields(data.settings.record)),
       id: note?.id || makeId(),
       patientId: patient.id,
       appointmentId: String(form.get('appointmentId') || ''),
@@ -236,15 +285,11 @@ function NoteModal({ data, patient, note, appointmentId, onClose, onSave, onDele
           </select>
         </Field>
       </div>
-      {noteGroups.map(group => (
-        <fieldset key={group.title} className="z-fieldset">
-          <legend>{group.title}</legend>
+      {data.settings.record.sections.map(section => (
+        <fieldset key={section.id} className="z-fieldset">
+          <legend>{section.title}</legend>
           <div className="z-form-grid">
-            {group.fields.map(([key, label, placeholder]) => (
-              <Field key={key} label={label} htmlFor={`n-${key}`} full={key === 'exam' || key === 'trichoMetrics'}>
-                <textarea id={`n-${key}`} name={key} className="z-textarea" rows={key === 'exam' || key === 'trichoMetrics' ? 4 : 2} placeholder={placeholder} defaultValue={note?.[key] || ''} />
-              </Field>
-            ))}
+            {section.fields.map(field => <TemplateInput key={field.key} field={field} prefix="n" value={note?.[field.key]} />)}
           </div>
         </fieldset>
       ))}
@@ -262,11 +307,12 @@ function NoteModal({ data, patient, note, appointmentId, onClose, onSave, onDele
   );
 }
 
-function ProfileModal({ profile, onClose, onSave }: { profile: PatientProfile; onClose: () => void; onSave: (profile: PatientProfile) => void }) {
+function ProfileModal({ fields, profile, onClose, onSave }: { fields: TemplateField[]; profile: PatientProfile; onClose: () => void; onSave: (profile: PatientProfile) => void }) {
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    onSave(Object.fromEntries(profileFields.map(([key]) => [key, String(form.get(key) || '').trim()])) as PatientProfile);
+    // Mantém respostas de campos que não estão no modelo atual (ex.: modelo trocado depois).
+    onSave({ ...profile, ...readFields(form, fields) } as PatientProfile);
   };
   return (
     <Modal
@@ -278,20 +324,13 @@ function ProfileModal({ profile, onClose, onSave }: { profile: PatientProfile; o
       footer={<><span className="spacer" /><button type="button" className="z-btn secondary" onClick={onClose}>Cancelar</button><button type="submit" className="z-btn brand">Salvar anamnese</button></>}
     >
       <div className="z-form-grid">
-        {profileFields.map(([key, label, kind]) => (
-          <Field key={key} label={label} htmlFor={`a-${key}`} full={kind === 'textarea'}>
-            {kind === 'date' ? <input id={`a-${key}`} name={key} className="z-input" type="date" defaultValue={profile[key]} />
-              : kind === 'textarea' ? <textarea id={`a-${key}`} name={key} className="z-textarea" rows={2} defaultValue={profile[key]} />
-              : kind === 'select' ? <select id={`a-${key}`} name={key} className="z-select" defaultValue={profile[key]}><option value="">Não informado</option>{communicationStyles.map(style => <option key={style}>{style}</option>)}</select>
-              : <input id={`a-${key}`} name={key} className="z-input" defaultValue={profile[key]} />}
-          </Field>
-        ))}
+        {fields.map(field => <TemplateInput key={field.key} field={field} prefix="a" value={profile[field.key]} />)}
       </div>
     </Modal>
   );
 }
 
-function MediaModal({ appointments, patientId, onClose, onSaved, onError }: { appointments: Appointment[]; patientId: string; onClose: () => void; onSaved: (item: MediaAttachment) => void; onError: (message: string) => void }) {
+function MediaModal({ kinds: MEDIA_KIND, appointments, patientId, onClose, onSaved, onError }: { kinds: Record<MediaAttachment['kind'], string>; appointments: Appointment[]; patientId: string; onClose: () => void; onSaved: (item: MediaAttachment) => void; onError: (message: string) => void }) {
   const [busy, setBusy] = useState(false);
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();

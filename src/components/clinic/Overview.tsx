@@ -2,6 +2,7 @@
 
 import { ArrowRight, BookOpen, CalendarDays, CalendarPlus, Plus, TrendingUp, Users, Wallet } from 'lucide-react';
 import { brl, formatDate } from '@/lib/clinic/format';
+import type { Access } from '@/lib/clinic/permissions';
 import { dayKey, verseForToday, type Appointment, type Store } from '@/lib/clinic/store';
 import { Metric, StatusBadge } from './common';
 import { MonthNav } from './MonthNav';
@@ -10,10 +11,11 @@ import type { ClinicView } from './types';
 
 type Props = {
   data: Store;
+  access: Access;
   month: string;
   onMonthChange: (month: string) => void;
-  onNew: () => void;
-  onOpen: (appointment: Appointment) => void;
+  onNew?: () => void;
+  onOpen?: (appointment: Appointment) => void;
   onNavigate: (view: ClinicView) => void;
 };
 
@@ -22,7 +24,9 @@ const greeting = () => {
   return hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
 };
 
-export function Overview({ data, month, onMonthChange, onNew, onOpen, onNavigate }: Props) {
+export function Overview({ data, access, month, onMonthChange, onNew, onOpen, onNavigate }: Props) {
+  const finance = access.modules.includes('financeiro');
+  const agenda = access.modules.includes('agenda');
   const today = dayKey(new Date());
   const monthItems = data.appointments.filter(item => item.date.startsWith(month));
   const scheduled = monthItems.filter(item => item.status === 'Agendada').length;
@@ -45,28 +49,30 @@ export function Overview({ data, month, onMonthChange, onNew, onOpen, onNavigate
         subtitle={todayCount ? `Você tem ${todayCount} consulta(s) hoje.` : 'Nenhuma consulta hoje.'}
         actions={<>
           <MonthNav month={month} onChange={onMonthChange} />
-          <button type="button" className="z-btn brand" onClick={onNew}><Plus />Nova consulta</button>
+          {onNew && <button type="button" className="z-btn brand" onClick={onNew}><Plus />Nova consulta</button>}
         </>}
       />
       <div className="z-metrics">
         <Metric label="Consultas no mês" value={String(monthItems.length)} note={`${scheduled} aguardando atendimento`} icon={CalendarDays} />
         <Metric label="Pacientes" value={String(data.patients.length)} note="Na sua base" icon={Users} />
-        <Metric label="Receita realizada" value={brl(revenue)} note="Consultas concluídas" icon={TrendingUp} tone="positive" />
-        <Metric label="Resultado" value={brl(result)} note="Receita − custos do mês" icon={Wallet} tone={result >= 0 ? 'positive' : 'negative'} />
+        {finance && <>
+          <Metric label="Receita realizada" value={brl(revenue)} note="Consultas concluídas" icon={TrendingUp} tone="positive" />
+          <Metric label="Resultado" value={brl(result)} note="Receita − custos do mês" icon={Wallet} tone={result >= 0 ? 'positive' : 'negative'} />
+        </>}
       </div>
       <div className="z-overview">
         <section className="z-card white z-section">
           <header className="z-section-head">
             <div><h2 className="t-h1">Próximos atendimentos</h2><p className="t-body t-muted">A partir de hoje.</p></div>
-            <button type="button" className="z-btn ghost sm" onClick={() => onNavigate('Agenda')}>Agenda<ArrowRight /></button>
+            {agenda && <button type="button" className="z-btn ghost sm" onClick={() => onNavigate('Agenda')}>Agenda<ArrowRight /></button>}
           </header>
           {upcoming.length ? (
             <ul className="z-daylist">
               {upcoming.map(item => (
                 <li key={item.id}>
-                  <button type="button" className="z-dayitem" onClick={() => onOpen(item)}>
+                  <button type="button" className="z-dayitem" onClick={() => onOpen?.(item)} disabled={!onOpen}>
                     <span className="z-dayitem-date num"><b>{formatDate(item.date, { day: '2-digit' })}</b><small>{formatDate(item.date, { month: 'short' }).replace('.', '')}</small></span>
-                    <span className="z-dayitem-main"><strong>{patientName(item.patientId)}</strong><small className="num">{item.time} · {item.type}{item.price ? ` · ${brl(item.price)}` : ''}</small></span>
+                    <span className="z-dayitem-main"><strong>{patientName(item.patientId)}</strong><small className="num">{item.time} · {item.type}{finance && item.price ? ` · ${brl(item.price)}` : ''}</small></span>
                     <StatusBadge status={item.status} small />
                   </button>
                 </li>
@@ -77,7 +83,7 @@ export function Overview({ data, month, onMonthChange, onNew, onOpen, onNavigate
               <CalendarPlus aria-hidden="true" />
               <strong>Agenda livre</strong>
               <span>Nenhuma consulta agendada daqui pra frente.</span>
-              <button type="button" className="z-btn brand" onClick={onNew}><Plus />Nova consulta</button>
+              {onNew && <button type="button" className="z-btn brand" onClick={onNew}><Plus />Nova consulta</button>}
             </div>
           )}
         </section>

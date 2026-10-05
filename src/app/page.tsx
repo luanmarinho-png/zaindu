@@ -12,16 +12,36 @@ import { Patients } from '@/components/clinic/Patients';
 import { Record } from '@/components/clinic/Record';
 import { Settings } from '@/components/clinic/Settings';
 import { Shell } from '@/components/clinic/Shell';
-import type { ClinicView } from '@/components/clinic/types';
+import { Team } from '@/components/clinic/Team';
+import { canView, type ClinicView } from '@/components/clinic/types';
 import { Toast } from '@/components/ui/Toast';
+import { applyBrand } from '@/lib/clinic/brand';
+import { blankUnreadable, canWrite, STORE_KEYS, type Access, type Brand } from '@/lib/clinic/permissions';
 import { cleanLocalStore, dayKey, initial, KEY, monthKey, readImageBlob, type Appointment, type Patient, type Store } from '@/lib/clinic/store';
 
 type AppointmentDraft = { appointment?: Appointment; date: string; patientId?: string };
+type Snapshot = Partial<Record<keyof Store, string>>;
+
+// Só as partes que mudaram desde o último salvamento e que o usuário pode gravar.
+function changedParts(data: Store, saved: Snapshot, access: Access) {
+  const parts: Partial<Record<keyof Store, unknown>> = {};
+  const json: Snapshot = {};
+  for (const key of STORE_KEYS) {
+    if (!canWrite(key, access.modules)) continue;
+    const value = JSON.stringify(data[key]);
+    if (value !== saved[key]) { parts[key] = data[key]; json[key] = value; }
+  }
+  return { parts, json };
+}
+
+const snapshotOf = (data: Store): Snapshot => Object.fromEntries(STORE_KEYS.map(key => [key, JSON.stringify(data[key])]));
 
 export default function Home() {
   const [data, setData] = useState<Store>(initial);
   const [ready, setReady] = useState(false);
-  const [access, setAccess] = useState<AccessState | 'authenticated'>('checking');
+  const [access, setAccess] = useState<Access | null>(null);
+  const [brand, setBrand] = useState<Brand | null>(null);
+  const [state, setState] = useState<AccessState | 'authenticated'>('checking');
   const [accessError, setAccessError] = useState('');
   const [saveError, setSaveError] = useState('');
   const [notice, setNotice] = useState('');
@@ -33,25 +53,37 @@ export default function Home() {
   const [patientDraft, setPatientDraft] = useState<{ patient?: Patient } | null>(null);
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const saveVersion = useRef(0);
+  const saved = useRef<Snapshot>({});
+
+  // Admin sem clínica aberta vai para a área de administração; os demais abrem o painel da própria clínica.
+  function route(next: Access) {
+    if (next.role === 'admin' && !next.clinicId) { window.location.replace('/admin'); return; }
+    setState('loading');
+  }
 
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/auth', { cache: 'no-store' }).then(response => response.json()).then(auth => {
+    fetch('/api/auth', { cache: 'no-store' }).then(async response => {
+      const auth = await response.json();
       if (cancelled) return;
-      if (!auth.configured) { setAccess('setup'); return; }
-      setAccess(auth.authenticated ? 'loading' : 'login');
-    }).catch(() => { if (!cancelled) { setAccessError('Não foi possível verificar o acesso. Confira sua conexão e tente novamente.'); setAccess('error'); } });
+      if (!response.ok) throw new Error(auth.error);
+      if (!auth.configured) { setState('setup'); return; }
+      if (auth.authenticated && auth.access) route(auth.access); else setState('login');
+    }).catch(() => { if (!cancelled) { setAccessError('Não foi possível verificar o acesso. Confira sua conexão e tente novamente.'); setState('error'); } });
     return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    if (access !== 'loading') return;
+    if (state !== 'loading') return;
     let cancelled = false;
     (async () => {
       try {
         const response = await fetch('/api/clinic', { cache: 'no-store' });
-        if (!response.ok) throw new Error((await response.json()).error || 'A conexão com a clínica falhou.');
-        const remote = (await response.json()).data as Partial<Store> | null;
+        const body = await response.json();
+        if (body.needsClinic) { window.location.replace('/admin'); return; }
+        if (!response.ok) throw new Error(body.error || 'A conexão com a clínica falhou.');
+        const who = body.access as Access;
+        const remote = body.data as Partial<Store> | null;
         let next = cleanLocalStore(remote || initial);
         if (!remote) {
           // Primeira abertura: migra o que estiver salvo neste navegador (versões antigas guardavam localmente).
@@ -71,44 +103,54 @@ export default function Home() {
               next = { ...next, media: next.media.filter(image => image.id !== item.id) };
             }
           }
-          const saved = await fetch('/api/clinic', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: next }) });
-          if (!saved.ok) throw new Error((await saved.json()).error || 'Não foi possível inicializar o armazenamento da clínica.');
+          const { parts } = changedParts(next, {}, who);
+          const init = await fetch('/api/clinic', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: parts }) });
+          if (!init.ok) throw new Error((await init.json()).error || 'Não foi possível inicializar o armazenamento da clínica.');
         }
         if (cancelled) return;
+        next = blankUnreadable(next, who.modules);
+        saved.current = snapshotOf(next);
         setData(next);
+        setAccess(who);
+        setBrand(body.brand);
+        applyBrand(body.brand?.color);
         try { localStorage.removeItem(KEY); } catch {}
         setReady(true);
-        setAccess('authenticated');
+        setState('authenticated');
       } catch (error) {
-        if (!cancelled) { setAccessError(error instanceof Error ? error.message : 'Não foi possível carregar os dados da clínica.'); setAccess('error'); }
+        if (!cancelled) { setAccessError(error instanceof Error ? error.message : 'Não foi possível carregar os dados da clínica.'); setState('error'); }
       }
     })();
     return () => { cancelled = true; };
-  }, [access]);
+  }, [state]);
 
-  // Salva no servidor 500 ms depois da última alteração; só a versão mais recente atualiza o aviso de erro.
+  // Salva no servidor 500 ms depois da última alteração, só o que mudou; só a versão mais recente atualiza o aviso de erro.
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !access) return;
     const version = ++saveVersion.current;
     const timer = setTimeout(() => {
-      const snapshot = JSON.stringify(data);
+      const { parts, json } = changedParts(data, saved.current, access);
+      if (!Object.keys(parts).length) { if (version === saveVersion.current) setSaveError(''); return; }
       saveQueue.current = saveQueue.current.catch(() => {}).then(async () => {
-        const response = await fetch('/api/clinic', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: JSON.parse(snapshot) }) });
+        const response = await fetch('/api/clinic', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data: parts }) });
         if (!response.ok) throw new Error((await response.json()).error || 'Falha ao salvar.');
+        saved.current = { ...saved.current, ...json };
         if (version === saveVersion.current) setSaveError('');
       }).catch(error => {
         if (version === saveVersion.current) setSaveError(error instanceof Error ? error.message : 'Falha ao salvar.');
       });
     }, 500);
     return () => clearTimeout(timer);
-  }, [data, ready]);
+  }, [data, ready, access]);
 
-  if (access !== 'authenticated' || !ready) {
-    return <Login state={access === 'authenticated' ? 'loading' : access} error={accessError} onAuthenticated={() => setAccess('loading')} />;
+  if (state !== 'authenticated' || !ready || !access) {
+    return <Login state={state === 'authenticated' ? 'loading' : state} error={accessError} onAuthenticated={route} />;
   }
 
+  const can = (module: Access['modules'][number]) => access.modules.includes(module);
+  const current = canView(view, access) ? view : 'Visão geral';
   const scheduledCount = data.appointments.filter(item => item.status === 'Agendada' && item.date.startsWith(monthKey(new Date()))).length;
-  const openAppointment = (appointment: Appointment) => setAppointmentDraft({ appointment, date: appointment.date });
+  const openAppointment = can('agenda') ? (appointment: Appointment) => setAppointmentDraft({ appointment, date: appointment.date }) : undefined;
   const newAppointment = (date = selectedDate, patientId?: string) => setAppointmentDraft({ date, patientId });
   const createPatient = (name: string) => {
     const patient = quickPatient(name);
@@ -133,17 +175,22 @@ export default function Home() {
     await fetch('/api/auth', { method: 'DELETE' }).catch(() => {});
     window.location.reload();
   }
+  async function exitClinic() {
+    await fetch('/api/admin/enter', { method: 'DELETE' }).catch(() => {});
+    window.location.assign('/admin');
+  }
 
   return (
     <>
-      <Shell view={view} onNavigate={setView} settings={data.settings} scheduledCount={scheduledCount} onLogout={logout}>
-        {view === 'Visão geral' && <Overview data={data} month={month} onMonthChange={setMonth} onNew={() => newAppointment(dayKey(new Date()))} onOpen={openAppointment} onNavigate={setView} />}
-        {view === 'Agenda' && <Agenda data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => newAppointment(date)} onOpen={openAppointment} />}
-        {view === 'Pacientes' && <Patients data={data} onNew={() => setPatientDraft({})} onEdit={patient => setPatientDraft({ patient })} onOpenRecord={id => { setSelectedPatientId(id); setView('Prontuário'); }} />}
-        {view === 'Prontuário' && <Record data={data} setData={setData} patientId={selectedPatientId} onSelectPatient={setSelectedPatientId} onEditPatient={patient => setPatientDraft({ patient })} onNewAppointment={id => newAppointment(dayKey(new Date()), id)} onError={setNotice} />}
-        {view === 'Financeiro' && <Finance data={data} setData={setData} month={month} onMonthChange={setMonth} />}
-        {view === 'Todos os dias' && <Daily />}
-        {view === 'Configurações' && <Settings data={data} setData={setData} />}
+      <Shell view={current} onNavigate={setView} settings={data.settings} brand={brand} access={access} scheduledCount={can('agenda') ? scheduledCount : 0} onLogout={logout} onExitClinic={access.role === 'admin' ? exitClinic : undefined}>
+        {current === 'Visão geral' && <Overview data={data} access={access} month={month} onMonthChange={setMonth} onNew={can('agenda') ? () => newAppointment(dayKey(new Date())) : undefined} onOpen={openAppointment} onNavigate={setView} />}
+        {current === 'Agenda' && <Agenda data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => newAppointment(date)} onOpen={appointment => setAppointmentDraft({ appointment, date: appointment.date })} />}
+        {current === 'Pacientes' && <Patients data={data} onNew={() => setPatientDraft({})} onEdit={patient => setPatientDraft({ patient })} onOpenRecord={can('prontuario') ? id => { setSelectedPatientId(id); setView('Prontuário'); } : undefined} />}
+        {current === 'Prontuário' && <Record data={data} setData={setData} patientId={selectedPatientId} onSelectPatient={setSelectedPatientId} onEditPatient={can('pacientes') ? patient => setPatientDraft({ patient }) : undefined} onNewAppointment={can('agenda') ? id => newAppointment(dayKey(new Date()), id) : undefined} onError={setNotice} />}
+        {current === 'Financeiro' && <Finance data={data} setData={setData} month={month} onMonthChange={setMonth} />}
+        {current === 'Equipe' && access.clinicId && <Team access={access} clinicId={access.clinicId} />}
+        {current === 'Todos os dias' && <Daily />}
+        {current === 'Configurações' && <Settings data={data} setData={setData} />}
       </Shell>
 
       {appointmentDraft && (
@@ -163,7 +210,7 @@ export default function Home() {
           onDelete={id => { setData(current => ({ ...current, appointments: current.appointments.filter(item => item.id !== id) })); setAppointmentDraft(null); }}
         />
       )}
-      {patientDraft && <PatientModal patient={patientDraft.patient} onSave={savePatient} onDelete={deletePatient} onClose={() => setPatientDraft(null)} />}
+      {patientDraft && <PatientModal patient={patientDraft.patient} onSave={savePatient} onDelete={can('pacientes') ? deletePatient : undefined} onClose={() => setPatientDraft(null)} />}
       {saveError && <Toast tone="danger" message={`Alterações não salvas: ${saveError}`} action={<button type="button" className="z-btn secondary sm" onClick={() => setData(current => ({ ...current }))}>Tentar de novo</button>} />}
       {notice && !saveError && <Toast tone="danger" message={notice} onClose={() => setNotice('')} />}
     </>

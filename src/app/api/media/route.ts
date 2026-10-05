@@ -1,7 +1,7 @@
 import { GridFSBucket, ObjectId } from 'mongodb';
 import { Readable } from 'node:stream';
 import { NextRequest, NextResponse } from 'next/server';
-import { hasClinicSession } from '@/lib/auth';
+import { getAccess } from '@/lib/auth';
 import { getDatabase } from '@/lib/mongodb';
 
 export const runtime = 'nodejs';
@@ -9,8 +9,9 @@ export const dynamic = 'force-dynamic';
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
-  if (!(await hasClinicSession())) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
   try {
+    const access = await getAccess();
+    if (!access?.clinicId || !access.modules.includes('prontuario')) return NextResponse.json({ error: 'Acesso não autorizado.' }, { status: 401 });
     const form = await request.formData();
     const file = form.get('image');
     const rawMetadata = form.get('metadata');
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
     const database = await getDatabase();
     const bucket = new GridFSBucket(database, { bucketName: 'patient_images' });
     const upload = bucket.openUploadStreamWithId(id, file.name.slice(0, 180), {
-      metadata: { contentType: file.type, patientId: String(metadata.patientId || ''), appointmentId: String(metadata.appointmentId || ''), kind: String(metadata.kind || '') },
+      metadata: { clinicId: access.clinicId, contentType: file.type, patientId: String(metadata.patientId || ''), appointmentId: String(metadata.appointmentId || ''), kind: String(metadata.kind || '') },
     });
     const contents = Buffer.from(await file.arrayBuffer());
     await new Promise<void>((resolve, reject) => {

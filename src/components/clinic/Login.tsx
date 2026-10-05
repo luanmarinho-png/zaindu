@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { Eye, EyeOff, LogIn, RotateCw } from 'lucide-react';
+import type { Access } from '@/lib/clinic/permissions';
 
 export type AccessState = 'checking' | 'setup' | 'login' | 'loading' | 'error';
 
-export function Login({ state, error, onAuthenticated }: { state: AccessState; error: string; onAuthenticated: () => void }) {
+export function Login({ state, error, onAuthenticated }: { state: AccessState; error: string; onAuthenticated: (access: Access) => void }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
@@ -21,7 +22,7 @@ export function Login({ state, error, onAuthenticated }: { state: AccessState; e
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Não foi possível entrar.');
       setPassword('');
-      onAuthenticated();
+      onAuthenticated(result.access);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Não foi possível entrar.');
     } finally {

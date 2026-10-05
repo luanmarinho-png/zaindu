@@ -12,7 +12,10 @@ import { Record } from '@/components/clinic/Record';
 import { Settings } from '@/components/clinic/Settings';
 import { Daily } from '@/components/clinic/Daily';
 import { Shell } from '@/components/clinic/Shell';
-import type { ClinicView } from '@/components/clinic/types';
+import { Team } from '@/components/clinic/Team';
+import { canView, type ClinicView } from '@/components/clinic/types';
+import { ALL_MODULES, blankUnreadable, type Access } from '@/lib/clinic/permissions';
+import { TEMPLATES, isTemplateId, recordFromTemplate } from '@/lib/clinic/templates';
 import { cleanLocalStore, dayKey, initial, monthKey, normalizePatient, type Appointment, type Patient, type Store } from '@/lib/clinic/store';
 
 function fixture(): Store {
@@ -33,8 +36,22 @@ function fixture(): Store {
   return cleanLocalStore({ ...initial, patients, appointments, settings: { ...initial.settings, clinicName: 'Clínica Teste', professionalName: 'Dra. Teste Silva', specialty: 'Tricologia' } });
 }
 
-export function DevPreview() {
-  const [data, setData] = useState<Store>(fixture);
+// ?papel=secretaria mostra o painel de quem só tem agenda e pacientes; ?modelo=dermatologia|geral troca o prontuário.
+function devAccess(papel?: string): Access {
+  return papel === 'secretaria'
+    ? { email: 'sec@zaindu.app', name: 'Secretária Teste', role: 'member', clinicId: 'dev', modules: ['agenda', 'pacientes'] }
+    : { email: 'gestora@zaindu.app', name: 'Gestora', role: 'manager', clinicId: 'dev', modules: ALL_MODULES };
+}
+
+function devFixture(access: Access, template?: string): Store {
+  const base = fixture();
+  if (isTemplateId(template)) base.settings = { ...base.settings, specialty: TEMPLATES[template].specialty, trichoscopyFindings: TEMPLATES[template].findings, record: recordFromTemplate(template) };
+  return blankUnreadable(base, access.modules);
+}
+
+export function DevPreview({ papel, modelo }: { papel?: string; modelo?: string }) {
+  const [access] = useState<Access>(() => devAccess(papel));
+  const [data, setData] = useState<Store>(() => devFixture(access, modelo));
   const [view, setView] = useState<ClinicView>('Visão geral');
   const [month, setMonth] = useState(() => monthKey(new Date()));
   const [selectedDate, setSelectedDate] = useState(() => dayKey(new Date()));
@@ -43,14 +60,15 @@ export function DevPreview() {
   const [patientDraft, setPatientDraft] = useState<{ patient?: Patient } | null>(null);
   return (
     <>
-      <Shell view={view} onNavigate={setView} settings={data.settings} scheduledCount={3} onLogout={() => {}}>
-        {view === 'Visão geral' && <Overview data={data} month={month} onMonthChange={setMonth} onNew={() => setAppt({ date: dayKey(new Date()) })} onOpen={a => setAppt({ appointment: a, date: a.date })} onNavigate={setView} />}
+      <Shell view={canView(view, access) ? view : 'Visão geral'} onNavigate={setView} settings={data.settings} access={access} scheduledCount={3} onLogout={() => {}}>
+        {view === 'Visão geral' && <Overview data={data} access={access} month={month} onMonthChange={setMonth} onNew={() => setAppt({ date: dayKey(new Date()) })} onOpen={a => setAppt({ appointment: a, date: a.date })} onNavigate={setView} />}
         {view === 'Agenda' && <Agenda data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => setAppt({ date })} onOpen={a => setAppt({ appointment: a, date: a.date })} />}
         {view === 'Pacientes' && <Patients data={data} onNew={() => setPatientDraft({})} onEdit={patient => setPatientDraft({ patient })} onOpenRecord={id => { setPatientId(id); setView('Prontuário'); }} />}
         {view === 'Prontuário' && <Record data={data} setData={setData} patientId={patientId} onSelectPatient={setPatientId} onEditPatient={patient => setPatientDraft({ patient })} onNewAppointment={() => setAppt({ date: dayKey(new Date()) })} onError={() => {}} />}
         {view === 'Financeiro' && <Finance data={data} setData={setData} month={month} onMonthChange={setMonth} />}
         {view === 'Todos os dias' && <Daily />}
         {view === 'Configurações' && <Settings data={data} setData={setData} />}
+        {view === 'Equipe' && <Team access={access} clinicId="dev" />}
       </Shell>
       {appt && <AppointmentModal data={data} appointment={appt.appointment} initialDate={appt.date} onCreatePatient={name => { const p = quickPatient(name); setData(d => ({ ...d, patients: [p, ...d.patients] })); return p.id; }} onClose={() => setAppt(null)} onSave={a => { setData(d => ({ ...d, appointments: [...d.appointments.filter(x => x.id !== a.id), a] })); setAppt(null); }} onDelete={id => { setData(d => ({ ...d, appointments: d.appointments.filter(x => x.id !== id) })); setAppt(null); }} />}
       {patientDraft && <PatientModal patient={patientDraft.patient} onSave={p => { setData(d => ({ ...d, patients: [...d.patients.filter(x => x.id !== p.id), p] })); setPatientDraft(null); }} onClose={() => setPatientDraft(null)} />}
