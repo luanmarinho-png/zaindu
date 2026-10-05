@@ -119,7 +119,7 @@ export async function PATCH(request: NextRequest) {
       changes.push(professional ? 'marcada como profissional' : 'deixou de ser profissional');
     }
     // Desconectar: toda sessão aberta antes de agora deixa de valer (também acontece ao trocar a senha).
-    if (body?.revoke === true) { update.sessionsValidAfter = new Date(); changes.push('desconectada de todos os aparelhos'); }
+    if (body?.revoke === true) { update.sessionsValidAfter = new Date(); changes.push('sessões encerradas em todos os aparelhos'); }
     if (body && ('modules' in body || 'profileId' in body)) {
       const chosen = accessFrom(body, await clinicProfiles(db, target.clinicId));
       if (typeof chosen === 'string') return fail(chosen, 400);
@@ -140,7 +140,7 @@ export async function PATCH(request: NextRequest) {
     }
     await members(db).updateOne({ _id: email }, { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
     if (changes.length) await recordAudit(db, target.clinicId, target.access, [`${update.name || member.name}: ${changes.join(', ')}`]).catch(() => {});
-    if (body?.revoke === true && !password) message = `${member.name} foi desconectada de todos os aparelhos.`;
+    if (body?.revoke === true && !password) message = `Sessões de ${member.name} encerradas em todos os aparelhos.`;
     return NextResponse.json({ saved: true, message }, { headers: noStore });
   } catch {
     return fail('Não foi possível salvar o usuário.', 503);
