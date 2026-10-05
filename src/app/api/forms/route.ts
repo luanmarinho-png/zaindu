@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
       { upsert: true },
     );
     return NextResponse.json({ saved: true }, { headers: { 'Cache-Control': 'no-store' } });
-  } catch {
+  } catch (error) {
+    console.error('forms: falha ao salvar no MongoDB', error instanceof Error ? error.message : error);
     return NextResponse.json({ error: 'Não foi possível salvar no MongoDB.' }, { status: 503 });
   }
 }
