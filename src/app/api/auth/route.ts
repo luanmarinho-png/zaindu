@@ -16,13 +16,15 @@ export async function POST(request: NextRequest) {
   let password = '';
   try {
     const body = await request.json();
-    email = String(body.email || '').trim();
+    email = String(body.email || '').trim().toLowerCase();
+    // Usuário sem domínio (ex.: "admin") vira admin@zaindu.app no Supabase.
+    if (email && !email.includes('@')) email = `${email}@zaindu.app`;
     password = String(body.password || '');
-  } catch { return NextResponse.json({ error: 'Informe e-mail e senha.' }, { status: 400 }); }
-  if (!email || !password) return NextResponse.json({ error: 'Informe e-mail e senha.' }, { status: 400 });
+  } catch { return NextResponse.json({ error: 'Informe usuário e senha.' }, { status: 400 }); }
+  if (!email || !password) return NextResponse.json({ error: 'Informe usuário e senha.' }, { status: 400 });
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) return NextResponse.json({ error: 'E-mail ou senha incorretos.' }, { status: 401 });
+  if (error) return NextResponse.json({ error: 'Usuário ou senha incorretos.' }, { status: 401 });
   return NextResponse.json({ authenticated: true });
 }
 
