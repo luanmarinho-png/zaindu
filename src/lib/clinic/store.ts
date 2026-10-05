@@ -53,7 +53,7 @@ export async function readImageBlob(key:string):Promise<Blob|undefined>{const db
 export async function deleteImageBlob(key:string):Promise<void>{const db=await openImageDb();await new Promise<void>((resolve,reject)=>{const tx=db.transaction('images','readwrite');tx.objectStore('images').delete(key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});db.close();}
 
 export function cleanLocalStore(value: Partial<Store> | null | undefined): Store {
-  const patients = (value?.patients || []).filter(patient => !/^(paciente demonstração|paciente teste|teste|demo patient)\b/i.test(patient.name.trim())).map(normalizePatient);
+  const patients = (value?.patients || []).map(normalizePatient);
   const patientIds = new Set(patients.map(patient => patient.id));
   return {
     ...initial,

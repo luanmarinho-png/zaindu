@@ -13,8 +13,9 @@ const ARRAY_KEYS = new Set<keyof Store>(['patients', 'appointments', 'notes', 'm
 const NUMBER_KEYS = new Set<keyof Store>(['knowledgeCost', 'targetMargin']);
 
 function cleanStore(value: Record<string, unknown>) {
+  // Nunca remove paciente pelo nome: renomear para "teste" apagaria o prontuário dele junto.
   const patients = Array.isArray(value.patients)
-    ? value.patients.filter((patient): patient is Record<string, unknown> => Boolean(patient) && typeof patient === 'object' && !/^(paciente demonstração|paciente teste|teste|demo patient)\b/i.test(String((patient as Record<string, unknown>).name || '').trim()))
+    ? value.patients.filter((patient): patient is Record<string, unknown> => Boolean(patient) && typeof patient === 'object')
     : [];
   const patientIds = new Set(patients.map(patient => String(patient.id || '')));
   const keepPatients = (items: unknown) => Array.isArray(items) ? items.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object' && patientIds.has(String((item as Record<string, unknown>).patientId || ''))) : [];
