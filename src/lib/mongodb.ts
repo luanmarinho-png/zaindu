@@ -13,7 +13,12 @@ export async function getDatabase(): Promise<Db> {
   let clientPromise = globalThis.clinicMongoClientPromise;
   if (!clientPromise) {
     const client = globalThis.clinicMongoClient ?? new MongoClient(uri, { maxPoolSize: 10 });
-    clientPromise = client.connect();
+    // Uma falha de conexão não pode ficar em cache: a próxima requisição tenta de novo.
+    clientPromise = client.connect().catch(error => {
+      globalThis.clinicMongoClient = undefined;
+      globalThis.clinicMongoClientPromise = undefined;
+      throw error;
+    });
     globalThis.clinicMongoClient = client;
     globalThis.clinicMongoClientPromise = clientPromise;
   }
