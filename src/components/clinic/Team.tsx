@@ -1,14 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { AtSign, Eye, EyeOff, IdCard, KeyRound, Pencil, Plus, ShieldCheck, Trash2, UserPlus, UserRound, Users } from 'lucide-react';
+import { AtSign, BadgeCheck, Eye, EyeOff, IdCard, LogOut, Stethoscope, KeyRound, Pencil, Plus, ShieldCheck, Trash2, UserPlus, UserRound, Users } from 'lucide-react';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
 import { DEFAULT_MEMBER_MODULES, MODULES, ROLE_LABEL, type Access, type AccessProfile, type Module } from '@/lib/clinic/permissions';
 import { PageHeader } from './Shell';
 
-export type TeamMember = { email: string; username: string; name: string; role: 'manager' | 'member'; profileId: string; modules: Module[] };
+export type TeamMember = { email: string; username: string; name: string; role: 'manager' | 'member'; profileId: string; modules: Module[]; professional: { specialty: string; registry: string } | null };
 type Draft = { member?: TeamMember };
 
 async function call(method: string, body: Record<string, unknown>, path = '/api/team') {
@@ -83,7 +83,7 @@ export function Team({ access, clinicId, embedded }: { access: Access; clinicId:
                 <span className="z-avatar">{member.name.slice(0, 1).toUpperCase()}</span>
                 <div className="z-patient-main">
                   <strong>{member.name}</strong>
-                  <small className="t-muted">{member.username}</small>
+                  <small className="t-muted">{[member.username, member.professional && [member.professional.specialty, member.professional.registry].filter(Boolean).join(' · ') || (member.professional ? 'profissional' : '')].filter(Boolean).join(' · ')}</small>
                 </div>
                 <div className="z-taglist z-team-modules">
                   {member.role === 'manager'
@@ -159,6 +159,19 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
   const [profileId, setProfileId] = useState(member ? member.profileId : profiles[0]?.id || '');
   const [modules, setModules] = useState<Module[]>(member?.modules || DEFAULT_MEMBER_MODULES);
   const profile = profiles.find(item => item.id === profileId);
+  // Profissional: atende, tem agenda própria e assina documentos. Novo membro herda a marcação do perfil.
+  const [isProfessional, setIsProfessional] = useState(member ? Boolean(member.professional) : Boolean(profiles[0]?.professional));
+  const [specialty, setSpecialty] = useState(member?.professional?.specialty || '');
+  const [registry, setRegistry] = useState(member?.professional?.registry || '');
+  const [revoking, setRevoking] = useState(false);
+  const professional = isProfessional ? { specialty, registry } : null;
+  async function revoke() {
+    if (!member) return;
+    setRevoking(true);
+    try { onSaved((await call('PATCH', { clinicId, email: member.email, revoke: true })).message || 'Sessões encerradas.'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível desconectar.'); }
+    finally { setRevoking(false); }
+  }
   const shown = profile ? profile.modules : modules;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -171,8 +184,8 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
     setError('');
     try {
       const result = member
-        ? await call('PATCH', { clinicId, email: member.email, name, profileId, modules, ...(isAdmin ? { role } : {}), ...(password ? { password } : {}) })
-        : await call('POST', { clinicId, name, username, password, role, profileId, modules });
+        ? await call('PATCH', { clinicId, email: member.email, name, profileId, modules, professional, ...(isAdmin ? { role } : {}), ...(password ? { password } : {}) })
+        : await call('POST', { clinicId, name, username, password, role, profileId, modules, professional });
       onSaved(result.message || 'Alterações salvas.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
@@ -213,7 +226,7 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
           <fieldset className="z-fieldset full z-module-list">
             <legend>O que pode acessar</legend>
             <Field label="Perfil de acesso" icon={IdCard} htmlFor="t-profile" hint={profile ? 'Os módulos seguem o perfil. Escolha “Personalizado” para ajustar só para esta pessoa.' : 'Acesso só desta pessoa.'} full>
-              <select id="t-profile" className="z-select" value={profileId} onChange={event => { const next = profiles.find(item => item.id === event.target.value); if (!event.target.value && profile) setModules(profile.modules); setProfileId(next?.id || ''); }}>
+              <select id="t-profile" className="z-select" value={profileId} onChange={event => { const next = profiles.find(item => item.id === event.target.value); if (!event.target.value && profile) setModules(profile.modules); setProfileId(next?.id || ''); if (!member && next) setIsProfessional(Boolean(next.professional)); }}>
                 {profiles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 <option value="">Personalizado</option>
               </select>
@@ -227,6 +240,26 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
             ))}
           </fieldset>
         )}
+        <fieldset className="z-fieldset full z-module-list">
+          <legend>Atendimento</legend>
+          <label className="z-switch z-module">
+            <input type="checkbox" checked={isProfessional} onChange={event => setIsProfessional(event.target.checked)} />
+            <span className="track" aria-hidden="true" />
+            <span><strong>Atende pacientes</strong><small className="t-muted">Tem agenda própria e assina receitas e atestados</small></span>
+          </label>
+          {isProfessional && (
+            <div className="z-form-grid">
+              <Field label="Especialidade" icon={Stethoscope} htmlFor="t-spec"><input id="t-spec" className="z-input" value={specialty} onChange={event => setSpecialty(event.target.value)} placeholder="Dermatologia" /></Field>
+              <Field label="Registro profissional" icon={BadgeCheck} htmlFor="t-reg"><input id="t-reg" className="z-input" value={registry} onChange={event => setRegistry(event.target.value)} placeholder="CRM/SP 123456" /></Field>
+            </div>
+          )}
+        </fieldset>
+        {member && (
+          <div className="z-field full">
+            <button type="button" className="z-btn secondary sm" onClick={revoke} disabled={revoking}><LogOut />{revoking ? 'Desconectando…' : 'Desconectar de todos os aparelhos'}</button>
+            <span className="z-hint">Encerra as sessões abertas. A pessoa entra de novo com a mesma senha. Trocar a senha também encerra.</span>
+          </div>
+        )}
         {error && <p className="z-callout danger full" role="alert">{error}</p>}
       </div>
     </Modal>
@@ -236,13 +269,14 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
 function ProfileModal({ profile, onClose, onSave }: { profile?: AccessProfile; onClose: () => void; onSave: (profile: AccessProfile) => void }) {
   const [name, setName] = useState(profile?.name || '');
   const [modules, setModules] = useState<Module[]>(profile?.modules || DEFAULT_MEMBER_MODULES);
+  const [professional, setProfessional] = useState(Boolean(profile?.professional));
   const toggle = (id: Module) => setModules(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
   return (
     <Modal
       title={profile ? `Editar perfil ${profile.name}` : 'Novo perfil de acesso'}
       description={profile ? 'A mudança vale na hora para todos com este perfil.' : 'Ex.: Secretária, Enfermagem, Financeiro.'}
       onClose={onClose}
-      onSubmit={event => { event.preventDefault(); if (name.trim()) onSave({ id: profile?.id || '', name: name.trim(), modules }); }}
+      onSubmit={event => { event.preventDefault(); if (name.trim()) onSave({ id: profile?.id || '', name: name.trim(), modules, professional }); }}
       footer={<><span className="spacer" /><button type="button" className="z-btn secondary" onClick={onClose}>Cancelar</button><button type="submit" className="z-btn brand">Salvar perfil</button></>}
     >
       <div className="z-form-grid">
@@ -257,6 +291,11 @@ function ProfileModal({ profile, onClose, onSave }: { profile?: AccessProfile; o
             </label>
           ))}
           <p className="z-hint">O que ficar desligado some do menu e não é enviado ao navegador dessa pessoa.</p>
+          <label className="z-switch z-module">
+            <input type="checkbox" checked={professional} onChange={event => setProfessional(event.target.checked)} />
+            <span className="track" aria-hidden="true" />
+            <span><strong>Perfil de profissional de saúde</strong><small className="t-muted">Ex.: Médico(a). Quem recebe já começa com agenda própria.</small></span>
+          </label>
         </fieldset>
       </div>
     </Modal>

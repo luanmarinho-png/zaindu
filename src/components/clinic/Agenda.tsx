@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { CalendarPlus, Clock, Plus } from 'lucide-react';
 import { brl, capitalize, formatDate } from '@/lib/clinic/format';
+import { MAIN_PROFESSIONAL, type Professional } from '@/lib/clinic/permissions';
 import { dayKey, monthKey, type Appointment, type Store } from '@/lib/clinic/store';
 import { StatusBadge } from './common';
 import { MonthNav } from './MonthNav';
@@ -20,9 +21,15 @@ type Props = {
   onOpen: (appointment: Appointment) => void;
   // Sem o módulo Financeiro, a agenda não mostra valores.
   showMoney?: boolean;
+  professionals?: Professional[];
+  // '' = todos os profissionais.
+  professionalFilter?: string;
+  onProfessionalFilter?: (id: string) => void;
 };
 
-export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate, onNew, onOpen, showMoney = true }: Props) {
+export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate, onNew, onOpen, showMoney = true, professionals = [], professionalFilter = '', onProfessionalFilter }: Props) {
+  const ofProfessional = (item: Appointment) => !professionalFilter || (item.professionalId || MAIN_PROFESSIONAL) === professionalFilter;
+  const proName = (item: Appointment) => professionals.length > 1 ? professionals.find(entry => entry.id === (item.professionalId || MAIN_PROFESSIONAL))?.name : undefined;
   const today = dayKey(new Date());
   const cells = useMemo(() => {
     const [year, monthIndex] = month.split('-').map(Number);
@@ -34,10 +41,11 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
   }, [month]);
   const byDay = useMemo(() => {
     const map = new Map<string, Appointment[]>();
-    for (const item of data.appointments) map.set(item.date, [...(map.get(item.date) || []), item]);
+    for (const item of data.appointments.filter(ofProfessional)) map.set(item.date, [...(map.get(item.date) || []), item]);
     for (const list of map.values()) list.sort((a, b) => a.time.localeCompare(b.time));
     return map;
-  }, [data.appointments]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.appointments, professionalFilter]);
   const patientName = (id: string) => data.patients.find(patient => patient.id === id)?.name || 'Paciente removido';
   const dayList = byDay.get(selectedDate) || [];
   const dayRevenue = dayList.filter(item => item.status !== 'Cancelada').reduce((sum, item) => sum + item.price, 0);
@@ -53,6 +61,12 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
         title="Agenda"
         subtitle="Toque num dia para ver os horários. Use + para agendar."
         actions={<>
+          {professionals.length > 1 && onProfessionalFilter && (
+            <select className="z-select z-pro-filter" aria-label="Agenda de" value={professionalFilter} onChange={event => onProfessionalFilter(event.target.value)}>
+              <option value="">Todos os profissionais</option>
+              {professionals.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          )}
           <MonthNav month={month} onChange={changeMonth} />
           <button type="button" className="z-btn brand" onClick={() => onNew(selectedDate)}><Plus />Nova consulta</button>
         </>}
@@ -112,7 +126,7 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
                 <li key={item.id}>
                   <button type="button" className="z-dayitem" onClick={() => onOpen(item)}>
                     <span className="z-dayitem-time num"><Clock aria-hidden="true" />{item.time}<small>{item.duration || 30} min</small></span>
-                    <span className="z-dayitem-main"><strong>{patientName(item.patientId)}</strong><small>{item.type}{showMoney && item.price ? ` · ${brl(item.price)}` : ''}</small></span>
+                    <span className="z-dayitem-main"><strong>{patientName(item.patientId)}</strong><small>{[item.type, !professionalFilter && proName(item), showMoney && item.price ? brl(item.price) : ''].filter(Boolean).join(' · ')}</small></span>
                     <StatusBadge status={item.status} small iconOnly />
                   </button>
                 </li>

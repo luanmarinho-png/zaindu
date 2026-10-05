@@ -1,15 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CalendarDays, Clock, NotebookPen, Stethoscope, Timer, TriangleAlert, User, Wallet, Trash2 } from 'lucide-react';
+import { CalendarDays, Clock, NotebookPen, Stethoscope, Timer, TriangleAlert, User, UserRoundCog, Wallet, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { brl, minutesOf, timeOf } from '@/lib/clinic/format';
-import { makeId, normalizePatient, serviceCost, type Appointment, type Store } from '@/lib/clinic/store';
-import { PatientPicker, StatusSegment } from './common';
+import { MAIN_PROFESSIONAL, type Professional } from '@/lib/clinic/permissions';
+import { findService, makeId, normalizePatient, servicePrice, type Appointment, type Store } from '@/lib/clinic/store';
+import { PatientPicker, Remember, StatusSegment } from './common';
 
-const DURATIONS = [30, 45, 60, 90];
+const DURATIONS = [15, 30, 45, 60, 90, 120];
 
 type Props = {
   data: Store;
@@ -21,15 +22,20 @@ type Props = {
   onCreatePatient: (name: string) => string;
   onClose: () => void;
   showMoney?: boolean;
+  professionals?: Professional[];
+  // Profissional já escolhido (filtro da agenda ou o próprio usuário, quando ele atende).
+  initialProfessionalId?: string;
 };
 
-export function AppointmentModal({ data, appointment, initialDate, initialPatientId = '', onSave, onDelete, onCreatePatient, onClose, showMoney = true }: Props) {
-  const types = data.settings.appointmentTypes.length ? data.settings.appointmentTypes : ['Consulta'];
+export function AppointmentModal({ data, appointment, initialDate, initialPatientId = '', onSave, onDelete, onCreatePatient, onClose, showMoney = true, professionals = [], initialProfessionalId = '' }: Props) {
+  // Tipos vêm dos atendimentos do Financeiro (com duração e preço); sem eles, da lista antiga das Configurações.
+  const types = data.services.length ? data.services.map(item => item.name) : data.settings.appointmentTypes.length ? data.settings.appointmentTypes : ['Consulta'];
   const [patientId, setPatientId] = useState(appointment?.patientId || initialPatientId);
   const [type, setType] = useState(appointment?.type || types[0]);
   const [date, setDate] = useState(appointment?.date || initialDate);
   const [time, setTime] = useState(appointment?.time || '09:00');
-  const [duration, setDuration] = useState(appointment?.duration || 30);
+  const [duration, setDuration] = useState(appointment?.duration || findService(data.services, appointment?.type || types[0])?.duration || 30);
+  const [professionalId, setProfessionalId] = useState(appointment?.professionalId || (initialProfessionalId !== MAIN_PROFESSIONAL ? initialProfessionalId : ''));
   const [price, setPrice] = useState(appointment?.price ?? 0);
   const [priceTouched, setPriceTouched] = useState(Boolean(appointment));
   const [status, setStatus] = useState<Appointment['status']>(appointment?.status || 'Agendada');
@@ -37,18 +43,25 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  // Preço sugerido: custo do serviço de mesmo nome + margem alvo, quando existir.
+  // Preço do atendimento de mesmo nome: o definido no Financeiro ou custo + margem.
   const suggested = useMemo(() => {
-    const service = data.services.find(item => item.name.toLocaleLowerCase('pt-BR') === type.toLocaleLowerCase('pt-BR'));
-    return service ? Math.round(serviceCost(service, data.supplies) * (1 + data.targetMargin / 100) * 100) / 100 : null;
+    const service = findService(data.services, type);
+    return service ? servicePrice(service, data.supplies, data.targetMargin) : null;
   }, [data.services, data.supplies, data.targetMargin, type]);
+  const chooseType = (next: string) => {
+    setType(next);
+    const service = findService(data.services, next);
+    if (service?.duration) setDuration(service.duration);
+  };
 
   const conflicts = useMemo(() => {
     const start = minutesOf(time);
     const end = start + duration;
+    // Só conflita com a agenda do mesmo profissional.
     return data.appointments.filter(item => item.id !== appointment?.id && item.date === date && item.status !== 'Cancelada'
+      && (item.professionalId || '') === professionalId
       && minutesOf(item.time) < end && minutesOf(item.time) + (item.duration || 30) > start);
-  }, [data.appointments, appointment?.id, date, time, duration]);
+  }, [data.appointments, appointment?.id, date, time, duration, professionalId]);
 
   const effectivePrice = !priceTouched && suggested !== null && !price ? suggested : price;
   const patientName = (id: string) => data.patients.find(patient => patient.id === id)?.name || 'Paciente';
@@ -57,7 +70,7 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
     event.preventDefault();
     setSubmitted(true);
     if (!patientId || !date || !time) return;
-    onSave({ id: appointment?.id || makeId(), patientId, type, date, time, duration, price: effectivePrice, status, notes: notes.trim() });
+    onSave({ id: appointment?.id || makeId(), patientId, type, date, time, duration, price: effectivePrice, status, notes: notes.trim(), ...(professionalId ? { professionalId } : {}) });
   };
 
   return (
@@ -80,7 +93,7 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
           <PatientPicker patients={data.patients} value={patientId} onChange={setPatientId} onQuickCreate={onCreatePatient} invalid={submitted && !patientId} />
         </Field>
         <Field label="Tipo de atendimento" icon={Stethoscope} htmlFor="appt-type">
-          <select id="appt-type" className="z-select" value={type} onChange={event => setType(event.target.value)}>
+          <select id="appt-type" className="z-select" value={type} onChange={event => chooseType(event.target.value)}>
             {types.map(item => <option key={item}>{item}</option>)}
             {!types.includes(type) && <option>{type}</option>}
           </select>
@@ -96,6 +109,14 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
         <Field label="Horário" icon={Clock} required htmlFor="appt-time" hint={`Termina às ${timeOf(minutesOf(time) + duration)}`}>
           <input id="appt-time" className="z-input" type="time" required step={300} value={time} onChange={event => setTime(event.target.value)} />
         </Field>
+        {data.patients.find(item => item.id === patientId) && <div className="full"><Remember patient={data.patients.find(item => item.id === patientId)!} compact /></div>}
+        {professionals.length > 1 && (
+          <Field label="Profissional" icon={UserRoundCog} htmlFor="appt-pro" full>
+            <select id="appt-pro" className="z-select" value={professionalId || MAIN_PROFESSIONAL} onChange={event => setProfessionalId(event.target.value === MAIN_PROFESSIONAL ? '' : event.target.value)}>
+              {professionals.map(item => <option key={item.id} value={item.id}>{item.name}{item.specialty ? ` · ${item.specialty}` : ''}</option>)}
+            </select>
+          </Field>
+        )}
         <Field label="Duração" icon={Timer} full>
           <div className="z-segment" role="group" aria-label="Duração">
             {DURATIONS.map(minutes => <button key={minutes} type="button" aria-pressed={duration === minutes} onClick={() => setDuration(minutes)}>{minutes} min</button>)}

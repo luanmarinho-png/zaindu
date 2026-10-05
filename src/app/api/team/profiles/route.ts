@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { clinics, members, profilesOf } from '@/lib/auth';
 import { fail, noStore, readJson, teamScope } from '@/lib/api';
+import { recordAudit } from '@/lib/audit';
 import { getDatabase } from '@/lib/mongodb';
 import { cleanModules, type AccessProfile } from '@/lib/clinic/permissions';
 
@@ -25,7 +26,7 @@ export async function PUT(request: NextRequest) {
       let id = /^[a-z0-9-]{1,40}$/.test(String(raw?.id || '')) ? String(raw.id) : slug(name);
       while (used.has(id)) id = `${id}-${used.size}`;
       used.add(id);
-      profiles.push({ id, name, modules: cleanModules(raw?.modules) });
+      profiles.push({ id, name, modules: cleanModules(raw?.modules), ...(raw?.professional === true ? { professional: true } : {}) });
     }
     const db = await getDatabase();
     const clinic = await clinics(db).findOne({ _id: target.clinicId }, { projection: { profiles: 1 } });
@@ -38,6 +39,7 @@ export async function PUT(request: NextRequest) {
       await members(db).updateMany({ clinicId: target.clinicId, profileId: profile.id }, { $set: { modules: profile.modules, updatedAt: new Date() } });
     }
     await clinics(db).updateOne({ _id: target.clinicId }, { $set: { profiles, updatedAt: new Date() } });
+    await recordAudit(db, target.clinicId, target.access, [`Perfis de acesso alterados: ${profiles.map(item => item.name).join(', ') || 'nenhum'}`]).catch(() => {});
     return NextResponse.json({ profiles }, { headers: noStore });
   } catch {
     return fail('Não foi possível salvar os perfis.', 503);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BookOpen, CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, ShieldCheck, UserCog, Users, Wallet, X, type LucideIcon } from 'lucide-react';
+import { CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, ShieldCheck, Users, Wallet, X, type LucideIcon } from 'lucide-react';
 import { ROLE_LABEL, type Access, type Brand } from '@/lib/clinic/permissions';
 import type { ClinicSettings } from '@/lib/clinic/store';
 import { canView, type ClinicView } from './types';
@@ -12,8 +12,6 @@ const NAV: [ClinicView, LucideIcon][] = [
   ['Pacientes', Users],
   ['Prontuário', ClipboardList],
   ['Financeiro', Wallet],
-  ['Equipe', UserCog],
-  ['Todos os dias', BookOpen],
   ['Configurações', Settings],
 ];
 
@@ -62,12 +60,12 @@ export function Shell({ view, onNavigate, settings, brand, access, scheduledCoun
               {item === 'Agenda' && scheduledCount > 0 && <span className="z-nav-count num">{scheduledCount}</span>}
             </button>
           ))}
+          {onExitClinic && (
+            <button type="button" className="z-nav-item z-exit-clinic" onClick={onExitClinic} title={collapsed ? 'Voltar ao admin' : undefined}>
+              <ShieldCheck aria-hidden="true" /><span className="z-nav-label">Voltar ao admin</span>
+            </button>
+          )}
         </nav>
-        {onExitClinic && (
-          <button type="button" className="z-nav-item z-exit-clinic" onClick={onExitClinic} title={collapsed ? 'Voltar ao admin' : undefined}>
-            <ShieldCheck aria-hidden="true" /><span className="z-nav-label">Voltar ao admin</span>
-          </button>
-        )}
         <div className="z-sidebar-user">
           <span className="z-avatar">{initial}</span>
           <div className="z-user-text">

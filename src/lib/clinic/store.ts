@@ -9,17 +9,23 @@ export type Patient = {
   emergencyName: string; emergencyPhone: string;
   insuranceType: 'Particular' | 'Convênio'; insuranceName: string; insuranceNumber: string;
   referralSource: string;
+  // Detalhes pessoais para um atendimento próximo (música, time, família, momentos marcantes).
+  rapport?: Record<string, string>;
 };
-export type Appointment = { id: string; patientId: string; date: string; time: string; type: string; status: 'Agendada' | 'Realizada' | 'Cancelada'; price: number; notes: string; duration: number };
+// professionalId vazio = profissional principal da clínica (o das Configurações).
+export type Appointment = { id: string; patientId: string; date: string; time: string; type: string; status: 'Agendada' | 'Realizada' | 'Cancelada'; price: number; notes: string; duration: number; professionalId?: string };
 // Anamnese e evolução seguem o modelo de prontuário da clínica, por isso os campos são abertos (chave → texto ou lista).
 export type PatientProfile = Record<string, string>;
 export type ClinicalNote = { id: string; patientId: string; appointmentId: string; date: string; selectedFindings: string[]; [field: string]: string | string[] };
 export type MediaAttachment = { id: string; patientId: string; appointmentId: string; kind: 'patient' | 'before' | 'after' | 'trichoscopy'; caption: string; capturedAt: string; mimeType: string; sizeBytes: number; storageKey: string; createdAt: string };
-export type ClinicSettings = { clinicName: string; professionalName: string; specialty: string; appointmentTypes: string[]; trichoscopyFindings: string[]; record: RecordConfig };
+export type ClinicSettings = { clinicName: string; professionalName: string; specialty: string; professionalRegistry: string; showDailyVerse?: boolean; appointmentTypes: string[]; trichoscopyFindings: string[]; record: RecordConfig };
 export type Supply = { id:string; name:string; category:string; unit:string; unitCost:number; defaultQty:number };
 export type ServiceItem = { supplyId: string; qty: number };
-export type Service = { id: string; name: string; knowledgeCost: number; items: ServiceItem[] };
-export type Store = { services: Service[]; supplies: Supply[]; knowledgeCost:number; targetMargin:number; patients: Patient[]; appointments: Appointment[]; notes: ClinicalNote[]; profiles: Record<string, PatientProfile>; media: MediaAttachment[]; settings: ClinicSettings; monthlyCosts: Record<string, { fixedCosts: number; investments: number }> };
+// price 0 = usa o preço sugerido (custo + margem). duration em minutos, usada ao agendar.
+export type Service = { id: string; name: string; knowledgeCost: number; items: ServiceItem[]; duration?: number; price?: number };
+export type DocumentKind = 'receita' | 'atestado' | 'comparecimento' | 'exames' | 'livre';
+export type ClinicalDocument = { id: string; patientId: string; kind: DocumentKind; title: string; body: string; date: string; professionalId: string; createdAt: string };
+export type Store = { services: Service[]; supplies: Supply[]; knowledgeCost:number; targetMargin:number; patients: Patient[]; appointments: Appointment[]; notes: ClinicalNote[]; profiles: Record<string, PatientProfile>; media: MediaAttachment[]; documents: ClinicalDocument[]; settings: ClinicSettings; monthlyCosts: Record<string, { fixedCosts: number; investments: number }> };
 export const KEY = 'raiz-viva-clinica-v1';
 export const IMAGE_DB = 'raiz-viva-images-v1';
 export type DailyVerse = { reference:string; theme:string; reflection:string };
@@ -35,11 +41,11 @@ export const dailyVerses:DailyVerse[] = [
   {reference:'Provérbios 31:16–18',theme:'Iniciativa e boa administração',reflection:'A mulher descrita avalia oportunidades, trabalha com disposição e administra com atenção.'},
 ];
 export const verseForToday = () => { const key=dayKey(new Date()); const seed=[...key].reduce((value,char)=>(value*31+char.charCodeAt(0))>>>0,7); return dailyVerses[seed%dailyVerses.length]; };
-export const defaultSettings: ClinicSettings = { clinicName: 'Sua clínica', professionalName: 'Profissional de saúde', specialty: 'Especialidade', appointmentTypes: ['Consulta','Retorno','Procedimento'], trichoscopyFindings: TEMPLATES.tricologia.findings, record: recordFromTemplate('tricologia') };
+export const defaultSettings: ClinicSettings = { clinicName: 'Sua clínica', professionalName: 'Profissional de saúde', specialty: 'Especialidade', professionalRegistry: '', appointmentTypes: ['Consulta','Retorno','Procedimento'], trichoscopyFindings: TEMPLATES.tricologia.findings, record: recordFromTemplate('tricologia') };
 export const initial: Store = {
   supplies: [
     {id:'s1',name:'Par de luvas de procedimento',category:'EPI',unit:'par',unitCost:1.2,defaultQty:1},{id:'s2',name:'Máscara descartável',category:'EPI',unit:'unidade',unitCost:0.6,defaultQty:1},{id:'s3',name:'Touca descartável',category:'EPI',unit:'unidade',unitCost:0.35,defaultQty:1},{id:'s4',name:'Campo / gaze / antisséptico',category:'Biossegurança',unit:'kit',unitCost:4,defaultQty:1},{id:'s5',name:'Kit/tubo para PRP',category:'PRP capilar',unit:'kit',unitCost:45,defaultQty:1},{id:'s6',name:'Seringa estéril',category:'PRP capilar',unit:'unidade',unitCost:1.5,defaultQty:1},{id:'s7',name:'Agulha estéril',category:'PRP capilar',unit:'unidade',unitCost:0.8,defaultQty:1},{id:'s9',name:'Ponteira/cartucho de microagulhamento',category:'MMP / microagulhamento',unit:'unidade',unitCost:18,defaultQty:1},{id:'s10',name:'Seringa para mescla',category:'MMP / mesclas',unit:'unidade',unitCost:1.5,defaultQty:1},{id:'s11',name:'Ativo/mescla capilar',category:'MMP / mesclas',unit:'dose',unitCost:25,defaultQty:1},{id:'s12',name:'LEDterapia: rateio por sessão',category:'Equipamentos',unit:'sessão',unitCost:8,defaultQty:1},{id:'s13',name:'Centrífuga: rateio/manutenção por sessão',category:'PRP capilar',unit:'sessão',unitCost:12,defaultQty:1},{id:'s14',name:'Coletor para perfurocortantes (rateio)',category:'Biossegurança',unit:'unidade',unitCost:0.5,defaultQty:1},{id:'s15',name:'Óculos de proteção / higienização (rateio)',category:'EPI',unit:'sessão',unitCost:1,defaultQty:1}], knowledgeCost:30, targetMargin:100,
-  services: [], patients: [], appointments: [], notes: [], profiles: {}, media: [], settings: defaultSettings, monthlyCosts: {},
+  services: [], patients: [], appointments: [], notes: [], profiles: {}, media: [], documents: [], settings: defaultSettings, monthlyCosts: {},
 };
 export const emptyProfile: PatientProfile = {};
 export const brl = (n: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n || 0);
@@ -63,6 +69,7 @@ export function cleanLocalStore(value: Partial<Store> | null | undefined): Store
     notes: (value?.notes || []).filter(item => patientIds.has(item.patientId)).map(note => ({ ...note, selectedFindings: note.selectedFindings || [] })),
     profiles: Object.fromEntries(Object.entries(value?.profiles || {}).filter(([id]) => patientIds.has(id))),
     media: (value?.media || []).filter(item => patientIds.has(item.patientId)),
+    documents: (value?.documents || []).filter(item => patientIds.has(item.patientId)),
     supplies: value?.supplies || initial.supplies,
     services: value?.services || legacyServices(value?.supplies || initial.supplies, value?.knowledgeCost ?? initial.knowledgeCost),
     knowledgeCost: value?.knowledgeCost ?? initial.knowledgeCost,
@@ -72,6 +79,19 @@ export function cleanLocalStore(value: Partial<Store> | null | undefined): Store
   };
 }
 
+
+// "Conhecer o paciente": o que lembrar na próxima consulta para criar conexão. Tudo opcional.
+export const RAPPORT_FIELDS: { key: string; label: string; placeholder: string }[] = [
+  { key: 'moments', label: 'Pontos marcantes para retomar', placeholder: 'Ex.: ia viajar para Portugal em março; filha passou no vestibular' },
+  { key: 'music', label: 'Música e artistas que gosta', placeholder: 'Ex.: MPB, Djavan, rock dos anos 80' },
+  { key: 'team', label: 'Time do coração', placeholder: 'Ex.: Palmeiras' },
+  { key: 'content', label: 'Conteúdos e pessoas que acompanha', placeholder: 'Séries, podcasts, livros, influenciadores, famosos' },
+  { key: 'hobbies', label: 'Hobbies, esportes e lazer', placeholder: 'Ex.: corrida, beach tennis, jardinagem' },
+  { key: 'family', label: 'Família e pets', placeholder: 'Nomes do parceiro(a), filhos, pets' },
+  { key: 'specialDates', label: 'Datas especiais', placeholder: 'Ex.: aniversário de casamento 12/06' },
+  { key: 'drink', label: 'O que oferecer na recepção', placeholder: 'Café sem açúcar, chá, água com gás' },
+  { key: 'comfort', label: 'Preferências no atendimento', placeholder: 'Conversa ou silêncio, temperatura, música ambiente, medos' },
+];
 
 export const emptyAddress: PatientAddress = { cep: '', street: '', number: '', complement: '', district: '', city: '', state: '' };
 
@@ -101,6 +121,14 @@ export function legacyServices(supplies: Supply[], knowledgeCost: number): Servi
     items: supplies.filter(item => terms.some(term => item.category.includes(term))).map(item => ({ supplyId: item.id, qty: item.defaultQty })),
   }));
 }
+
+// Preço de venda: o definido no atendimento ou, sem ele, custo + margem alvo.
+export function servicePrice(service: Service, supplies: Supply[], targetMargin: number): number {
+  if (service.price) return service.price;
+  return Math.round(serviceCost(service, supplies) * (1 + targetMargin / 100) * 100) / 100;
+}
+
+export const findService = (services: Service[], name: string) => services.find(item => item.name.toLocaleLowerCase('pt-BR') === name.toLocaleLowerCase('pt-BR'));
 
 export function serviceCost(service: Service, supplies: Supply[]): number {
   return service.items.reduce((sum, item) => sum + (supplies.find(supply => supply.id === item.supplyId)?.unitCost || 0) * item.qty, 0) + service.knowledgeCost;

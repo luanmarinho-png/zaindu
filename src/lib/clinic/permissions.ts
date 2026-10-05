@@ -3,7 +3,10 @@ import type { Store } from './store';
 
 export type Module = 'agenda' | 'pacientes' | 'prontuario' | 'financeiro' | 'configuracoes';
 export type Role = 'admin' | 'manager' | 'member';
-export type Access = { email: string; name: string; role: Role; clinicId: string | null; modules: Module[] };
+// professional = a própria pessoa atende pacientes e tem agenda (id = e-mail).
+export type Access = { email: string; name: string; role: Role; clinicId: string | null; modules: Module[]; professional?: boolean };
+export type Professional = { id: string; name: string; specialty: string; registry: string };
+export const MAIN_PROFESSIONAL = 'principal';
 export type Brand = { id: string; name: string; color: string; logo: string };
 
 export const MODULES: { id: Module; label: string; hint: string }[] = [
@@ -20,8 +23,12 @@ export const DEFAULT_MEMBER_MODULES: Module[] = ['agenda', 'pacientes'];
 
 // Perfil de acesso: a gestora define uma vez (ex.: Secretária) e cada pessoa nova com esse perfil herda os módulos.
 // Mudar o perfil muda o acesso de todos que o usam.
-export type AccessProfile = { id: string; name: string; modules: Module[] };
-export const DEFAULT_PROFILES: AccessProfile[] = [{ id: 'secretaria', name: 'Secretária', modules: DEFAULT_MEMBER_MODULES }];
+// professional: quem recebe o perfil já começa marcado como profissional com agenda própria.
+export type AccessProfile = { id: string; name: string; modules: Module[]; professional?: boolean };
+export const DEFAULT_PROFILES: AccessProfile[] = [
+  { id: 'secretaria', name: 'Secretária', modules: DEFAULT_MEMBER_MODULES },
+  { id: 'medico', name: 'Médico(a)', modules: ['agenda', 'pacientes', 'prontuario'], professional: true },
+];
 
 export const isModule = (value: unknown): value is Module => typeof value === 'string' && (ALL_MODULES as string[]).includes(value);
 export const cleanModules = (value: unknown): Module[] => Array.isArray(value) ? ALL_MODULES.filter(id => value.includes(id)) : [];
@@ -35,7 +42,9 @@ export const STORE_RULES: Record<keyof Store, Rule> = {
   notes: { read: ['prontuario'], write: ['prontuario'] },
   profiles: { read: ['prontuario'], write: ['prontuario'] },
   media: { read: ['prontuario'], write: ['prontuario'] },
-  services: { read: ['financeiro'], write: ['financeiro'] },
+  documents: { read: ['prontuario'], write: ['prontuario'] },
+  // A agenda recebe só nome e duração dos atendimentos; valores e insumos ficam com o Financeiro.
+  services: { read: ['financeiro', 'agenda'], write: ['financeiro'] },
   supplies: { read: ['financeiro'], write: ['financeiro'] },
   knowledgeCost: { read: ['financeiro'], write: ['financeiro'] },
   targetMargin: { read: ['financeiro'], write: ['financeiro'] },

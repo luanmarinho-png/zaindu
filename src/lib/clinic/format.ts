@@ -50,3 +50,8 @@ export const minutesOf = (time: string) => {
 };
 
 export const timeOf = (minutes: number) => `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
+
+// Eixo de gráfico: "R$ 1,2 mil" cabe onde "R$ 1.200,00" não cabe.
+const compactFormatter = new Intl.NumberFormat('pt-BR', { notation: 'compact', maximumFractionDigits: 1 });
+export const brlCompact = (value: number) => `R$ ${compactFormatter.format(Number.isFinite(value) ? value : 0)}`;
+export const percent = (value: number) => `${Math.round(value * 100)}%`;

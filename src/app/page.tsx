@@ -16,7 +16,7 @@ import { Team } from '@/components/clinic/Team';
 import { canView, type ClinicView } from '@/components/clinic/types';
 import { Toast } from '@/components/ui/Toast';
 import { applyBrand } from '@/lib/clinic/brand';
-import { blankUnreadable, canWrite, STORE_KEYS, type Access, type Brand } from '@/lib/clinic/permissions';
+import { blankUnreadable, canWrite, STORE_KEYS, type Access, type Brand, type Professional } from '@/lib/clinic/permissions';
 import { cleanLocalStore, dayKey, initial, KEY, monthKey, readImageBlob, type Appointment, type Patient, type Store } from '@/lib/clinic/store';
 
 type AppointmentDraft = { appointment?: Appointment; date: string; patientId?: string };
@@ -41,6 +41,8 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [access, setAccess] = useState<Access | null>(null);
   const [brand, setBrand] = useState<Brand | null>(null);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [professionalFilter, setProfessionalFilter] = useState('');
   const [state, setState] = useState<AccessState | 'authenticated'>('checking');
   const [accessError, setAccessError] = useState('');
   const [saveError, setSaveError] = useState('');
@@ -54,6 +56,7 @@ export default function Home() {
   const saveQueue = useRef<Promise<void>>(Promise.resolve());
   const saveVersion = useRef(0);
   const saved = useRef<Snapshot>({});
+  const version = useRef(0);
 
   // Admin sem clínica aberta vai para a área de administração; os demais abrem o painel da própria clínica.
   function route(next: Access) {
@@ -113,6 +116,10 @@ export default function Home() {
         setData(next);
         setAccess(who);
         setBrand(body.brand);
+        setProfessionals(body.professionals || []);
+        // Quem atende abre a agenda já filtrada na própria; os demais veem todos.
+        setProfessionalFilter(who.professional ? who.email : '');
+        version.current = body.version || 0;
         applyBrand(body.brand?.color);
         try { localStorage.removeItem(KEY); } catch {}
         setReady(true);
@@ -142,6 +149,39 @@ export default function Home() {
     }, 500);
     return () => clearTimeout(timer);
   }, [data, ready, access]);
+
+  // Atualização automática: a cada 30 s (e ao voltar para a aba) traz o que outras pessoas salvaram.
+  // Partes com alteração local ainda não salva ficam como estão, para não perder o que está sendo digitado.
+  useEffect(() => {
+    if (!ready || !access) return;
+    let busy = false;
+    const refresh = async () => {
+      if (busy || document.visibilityState !== 'visible') return;
+      busy = true;
+      try {
+        const response = await fetch('/api/clinic', { cache: 'no-store' });
+        if (!response.ok) return;
+        const body = await response.json();
+        if (!body.version || body.version === version.current || !body.data) return;
+        version.current = body.version;
+        setProfessionals(body.professionals || []);
+        const remote = blankUnreadable(cleanLocalStore(body.data as Partial<Store>), access.modules);
+        setData(current => {
+          const next = { ...current } as Record<keyof Store, unknown>;
+          for (const key of STORE_KEYS) {
+            const local = JSON.stringify(current[key]);
+            const incoming = JSON.stringify(remote[key]);
+            if (local === saved.current[key] && incoming !== local) { next[key] = remote[key]; saved.current = { ...saved.current, [key]: incoming }; }
+          }
+          return next as Store;
+        });
+      } catch {} finally { busy = false; }
+    };
+    const timer = setInterval(refresh, 30_000);
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', refresh); window.removeEventListener('focus', refresh); };
+  }, [ready, access]);
 
   if (state !== 'authenticated' || !ready || !access) {
     return <Login state={state === 'authenticated' ? 'loading' : state} error={accessError} onAuthenticated={route} />;
@@ -183,19 +223,21 @@ export default function Home() {
   return (
     <>
       <Shell view={current} onNavigate={setView} settings={data.settings} brand={brand} access={access} scheduledCount={can('agenda') ? scheduledCount : 0} onLogout={logout} onExitClinic={access.role === 'admin' ? exitClinic : undefined}>
-        {current === 'Visão geral' && <Overview data={data} access={access} month={month} onMonthChange={setMonth} onNew={can('agenda') ? () => newAppointment(dayKey(new Date())) : undefined} onOpen={openAppointment} onNavigate={setView} />}
-        {current === 'Agenda' && <Agenda showMoney={can('financeiro')} data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => newAppointment(date)} onOpen={appointment => setAppointmentDraft({ appointment, date: appointment.date })} />}
+        {current === 'Visão geral' && <Overview data={data} access={access} professionals={professionals} month={month} onMonthChange={setMonth} onNew={can('agenda') ? () => newAppointment(dayKey(new Date())) : undefined} onOpen={openAppointment} onNavigate={setView} />}
+        {current === 'Agenda' && <Agenda showMoney={can('financeiro')} professionals={professionals} professionalFilter={professionalFilter} onProfessionalFilter={setProfessionalFilter} data={data} month={month} onMonthChange={setMonth} selectedDate={selectedDate} onSelectDate={setSelectedDate} onNew={date => newAppointment(date)} onOpen={appointment => setAppointmentDraft({ appointment, date: appointment.date })} />}
         {current === 'Pacientes' && <Patients data={data} onNew={() => setPatientDraft({})} onEdit={patient => setPatientDraft({ patient })} onOpenRecord={can('prontuario') ? id => { setSelectedPatientId(id); setView('Prontuário'); } : undefined} />}
-        {current === 'Prontuário' && <Record data={data} setData={setData} patientId={selectedPatientId} onSelectPatient={setSelectedPatientId} onEditPatient={can('pacientes') ? patient => setPatientDraft({ patient }) : undefined} onNewAppointment={can('agenda') ? id => newAppointment(dayKey(new Date()), id) : undefined} onError={setNotice} />}
-        {current === 'Financeiro' && <Finance data={data} setData={setData} month={month} onMonthChange={setMonth} />}
+        {current === 'Prontuário' && <Record access={access} brand={brand} professionals={professionals} data={data} setData={setData} patientId={selectedPatientId} onSelectPatient={setSelectedPatientId} onEditPatient={can('pacientes') ? patient => setPatientDraft({ patient }) : undefined} onNewAppointment={can('agenda') ? id => newAppointment(dayKey(new Date()), id) : undefined} onError={setNotice} />}
+        {current === 'Financeiro' && <Finance professionals={professionals} data={data} setData={setData} month={month} onMonthChange={setMonth} />}
         {current === 'Equipe' && access.clinicId && <Team access={access} clinicId={access.clinicId} />}
         {current === 'Todos os dias' && <Daily />}
-        {current === 'Configurações' && <Settings data={data} setData={setData} />}
+        {current === 'Configurações' && <Settings data={data} setData={setData} access={access} brand={brand} onBrandChange={setBrand} />}
       </Shell>
 
       {appointmentDraft && (
         <AppointmentModal
           showMoney={can('financeiro')}
+          professionals={professionals}
+          initialProfessionalId={professionalFilter}
           data={data}
           appointment={appointmentDraft.appointment}
           initialDate={appointmentDraft.date}

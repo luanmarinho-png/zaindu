@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import { Camera, CalendarPlus, ClipboardList, FilePlus2, HeartPulse, ImagePlus, MessageCircleHeart, Pill, Trash2, TriangleAlert, UserPen } from 'lucide-react';
+import { Camera, CalendarPlus, ClipboardList, Columns2, FilePlus2, FileText, HeartPulse, ImagePlus, MessageCircleHeart, Pill, Printer, Trash2, TriangleAlert, UserPen } from 'lucide-react';
+import { MAIN_PROFESSIONAL, type Access, type Brand, type Professional } from '@/lib/clinic/permissions';
+import { DocumentModal, DOCUMENT_KINDS, printDocument } from './Documents';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { ageFrom, formatDate } from '@/lib/clinic/format';
-import { emptyProfile, makeId, type Appointment, type ClinicalNote, type MediaAttachment, type Patient, type PatientProfile, type Store } from '@/lib/clinic/store';
+import { emptyProfile, makeId, type Appointment, type ClinicalDocument, type ClinicalNote, type MediaAttachment, type Patient, type PatientProfile, type Store } from '@/lib/clinic/store';
 import { allNoteFields, type TemplateField, type TemplateId } from '@/lib/clinic/templates';
-import { PatientPicker, StatusBadge } from './common';
+import { PatientPicker, Remember, StatusBadge } from './common';
 import { PageHeader } from './Shell';
 import type { ClinicProps } from './types';
 
@@ -16,6 +18,9 @@ const SCOPE_LABEL: Record<TemplateId, string> = { tricologia: 'Tricoscopia', der
 const mediaKinds = (template: TemplateId): Record<MediaAttachment['kind'], string> => ({ patient: 'Paciente', before: 'Antes', after: 'Depois', trichoscopy: SCOPE_LABEL[template] });
 
 type Props = ClinicProps & {
+  access?: Access;
+  brand?: Brand | null;
+  professionals?: Professional[];
   patientId: string;
   onSelectPatient: (id: string) => void;
   onEditPatient?: (patient: Patient) => void;
@@ -23,10 +28,12 @@ type Props = ClinicProps & {
   onError: (message: string) => void;
 };
 
-export function Record({ data, setData, patientId, onSelectPatient, onEditPatient, onNewAppointment, onError }: Props) {
+export function Record({ data, setData, patientId, onSelectPatient, onEditPatient, onNewAppointment, onError, access, brand = null, professionals = [] }: Props) {
   const [noteModal, setNoteModal] = useState<{ note?: ClinicalNote; appointmentId: string } | null>(null);
   const [profileModal, setProfileModal] = useState(false);
   const [mediaModal, setMediaModal] = useState(false);
+  const [documentModal, setDocumentModal] = useState<{ document?: ClinicalDocument } | null>(null);
+  const [compare, setCompare] = useState(false);
   const patient = data.patients.find(item => item.id === patientId);
   const profile = data.profiles[patientId] || emptyProfile;
   const notes = data.notes.filter(note => note.patientId === patientId).sort((a, b) => b.date.localeCompare(a.date));
@@ -37,6 +44,13 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
   const record = data.settings.record;
   const anamnesis = record.anamnesis.filter(field => hasValue(profile[field.key]));
   const MEDIA_KIND = mediaKinds(record.template);
+  const documents = (data.documents || []).filter(item => item.patientId === patientId).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+  const proName = (id: string) => professionals.find(item => item.id === (id || MAIN_PROFESSIONAL))?.name || data.settings.professionalName;
+  const print = (item: ClinicalDocument) => {
+    if (!patient) return;
+    const ok = printDocument(item, patient, data.settings, brand, professionals.find(entry => entry.id === (item.professionalId || MAIN_PROFESSIONAL)));
+    if (!ok) onError('O navegador bloqueou a janela de impressão. Libere pop-ups para este site e tente de novo.');
+  };
 
   async function removeMedia(item: MediaAttachment) {
     try {
@@ -79,6 +93,7 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
       </section>
 
       {patient && <>
+        <Remember patient={patient} />
         <div className="z-alerts">
           <Alert icon={TriangleAlert} label="Alergias" value={profile.allergies || ''} empty="Não informado, confirmar" warn={Boolean(profile.allergies)} />
           <Alert icon={HeartPulse} label="Comorbidades" value={profile.comorbidities || ''} empty="Não informado" />
@@ -101,7 +116,10 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
         <section className="z-card white z-section">
           <header className="z-section-head">
             <div><h2 className="t-h1">Fotografias</h2><p className="t-body t-muted">Referência, antes e depois, ligadas à data e à consulta.</p></div>
-            <button type="button" className="z-btn secondary" onClick={() => setMediaModal(true)}><ImagePlus />Anexar imagem</button>
+            <div className="z-row-actions">
+              {media.length > 1 && <button type="button" className="z-btn secondary" onClick={() => setCompare(true)}><Columns2 />Comparar</button>}
+              <button type="button" className="z-btn secondary" onClick={() => setMediaModal(true)}><ImagePlus />Anexar imagem</button>
+            </div>
           </header>
           {media.length ? (
             <div className="z-media-grid">
@@ -118,6 +136,27 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
               ))}
             </div>
           ) : <div className="z-empty"><Camera aria-hidden="true" /><span>Nenhuma imagem anexada.</span></div>}
+        </section>
+
+        <section className="z-card white z-section">
+          <header className="z-section-head">
+            <div><h2 className="t-h1">Documentos</h2><p className="t-body t-muted">Receitas, atestados e solicitações com o timbre da clínica.</p></div>
+            <button type="button" className="z-btn secondary" onClick={() => setDocumentModal({})}><FileText />Emitir documento</button>
+          </header>
+          {documents.length ? (
+            <ul className="z-doclist">
+              {documents.map(item => (
+                <li key={item.id}>
+                  <FileText aria-hidden="true" />
+                  <div><strong>{item.title}</strong><small className="t-muted">{formatDate(item.date)} · {proName(item.professionalId)}</small></div>
+                  <div className="z-row-actions">
+                    <button type="button" className="z-btn ghost sm" onClick={() => setDocumentModal({ document: item })}>Editar</button>
+                    <button type="button" className="z-btn secondary sm" onClick={() => print(item)}><Printer />Imprimir</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : <div className="z-empty"><span>Nenhum documento emitido.</span></div>}
         </section>
 
         <section className="z-card white z-section">
@@ -182,6 +221,22 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
       {profileModal && patient && (
         <ProfileModal fields={record.anamnesis} profile={profile} onClose={() => setProfileModal(false)} onSave={next => { setData(current => ({ ...current, profiles: { ...current.profiles, [patient.id]: next } })); setProfileModal(false); }} />
       )}
+      {documentModal && patient && (
+        <DocumentModal
+          patient={patient}
+          professionals={professionals}
+          defaultProfessional={access?.professional ? access.email : MAIN_PROFESSIONAL}
+          document={documentModal.document}
+          onClose={() => setDocumentModal(null)}
+          onDelete={id => { setData(current => ({ ...current, documents: current.documents.filter(item => item.id !== id) })); setDocumentModal(null); }}
+          onSave={(next, andPrint) => {
+            setData(current => ({ ...current, documents: current.documents.some(item => item.id === next.id) ? current.documents.map(item => item.id === next.id ? next : item) : [next, ...current.documents] }));
+            setDocumentModal(null);
+            if (andPrint) print(next);
+          }}
+        />
+      )}
+      {compare && patient && <CompareModal media={media} kinds={MEDIA_KIND} onClose={() => setCompare(false)} />}
       {mediaModal && patient && (
         <MediaModal kinds={MEDIA_KIND} appointments={appointments} patientId={patient.id} onClose={() => setMediaModal(false)} onError={onError} onSaved={item => { setData(current => ({ ...current, media: [item, ...current.media] })); setMediaModal(false); }} />
       )}
@@ -370,6 +425,39 @@ function MediaModal({ kinds: MEDIA_KIND, appointments, patientId, onClose, onSav
         <Field label="Legenda" full htmlFor="m-caption"><input id="m-caption" name="caption" className="z-input" placeholder="Ex.: frontal, vértex, lado direito" /></Field>
         <Field label="Consulta" full htmlFor="m-appt"><select id="m-appt" name="appointmentId" className="z-select" defaultValue=""><option value="">Sem vínculo</option>{appointments.map(item => <option key={item.id} value={item.id}>{formatDate(item.date)} · {item.type}</option>)}</select></Field>
       </div>
+    </Modal>
+  );
+}
+
+// Duas imagens lado a lado (antes e depois), com data e legenda de cada uma.
+function CompareModal({ media, kinds, onClose }: { media: MediaAttachment[]; kinds: Record<MediaAttachment['kind'], string>; onClose: () => void }) {
+  const chronological = [...media].sort((a, b) => a.capturedAt.localeCompare(b.capturedAt));
+  const firstBefore = chronological.find(item => item.kind === 'before') || chronological[0];
+  const lastAfter = [...chronological].reverse().find(item => item.kind === 'after' && item.id !== firstBefore.id) || chronological[chronological.length - 1];
+  const [left, setLeft] = useState(firstBefore.id);
+  const [right, setRight] = useState(lastAfter.id);
+  const label = (item: MediaAttachment) => `${formatDate(item.capturedAt)} · ${kinds[item.kind]}${item.caption ? ` · ${item.caption}` : ''}`;
+  const side = (id: string, onChange: (id: string) => void, name: string) => {
+    const item = media.find(entry => entry.id === id);
+    return (
+      <figure className="z-compare-side">
+        <select className="z-select" aria-label={name} value={id} onChange={event => onChange(event.target.value)}>
+          {chronological.map(entry => <option key={entry.id} value={entry.id}>{label(entry)}</option>)}
+        </select>
+        {item && <img src={`/api/media/${encodeURIComponent(item.storageKey)}`} alt={label(item)} />}
+        {item && <figcaption><span className="z-badge sm">{kinds[item.kind]}</span>{formatDate(item.capturedAt, { day: '2-digit', month: 'long', year: 'numeric' })}</figcaption>}
+      </figure>
+    );
+  };
+  const days = (() => {
+    const a = media.find(entry => entry.id === left);
+    const b = media.find(entry => entry.id === right);
+    if (!a || !b) return null;
+    return Math.round(Math.abs(new Date(b.capturedAt).getTime() - new Date(a.capturedAt).getTime()) / 864e5);
+  })();
+  return (
+    <Modal size="lg" title="Comparar imagens" description={days ? `${days} dia(s) entre as duas imagens.` : 'Escolha as duas imagens.'} onClose={onClose}>
+      <div className="z-compare">{side(left, setLeft, 'Imagem da esquerda')}{side(right, setRight, 'Imagem da direita')}</div>
     </Modal>
   );
 }

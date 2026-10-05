@@ -1,8 +1,8 @@
 'use client';
 
 import { useId, useMemo, useState } from 'react';
-import { CalendarClock, CircleCheck, CircleX, Search, UserPlus, type LucideIcon } from 'lucide-react';
-import type { Appointment, Patient } from '@/lib/clinic/store';
+import { CalendarClock, CircleCheck, CircleX, Search, Sparkles, UserPlus, type LucideIcon } from 'lucide-react';
+import { RAPPORT_FIELDS, type Appointment, type Patient } from '@/lib/clinic/store';
 
 const STATUS: Record<Appointment['status'], { tone: string; Icon: LucideIcon }> = {
   Agendada: { tone: 'info', Icon: CalendarClock },
@@ -115,5 +115,19 @@ export function PatientPicker({ patients, value, onChange, onQuickCreate, invali
         </ul>
       )}
     </div>
+  );
+}
+
+// "Para lembrar": o que a equipe registrou em Conhecer o paciente, mostrado antes e durante a consulta.
+export function Remember({ patient, compact }: { patient: Patient; compact?: boolean }) {
+  const filled = RAPPORT_FIELDS.filter(field => patient.rapport?.[field.key]?.trim());
+  if (!filled.length) return null;
+  return (
+    <section className="z-remember" aria-label="Para lembrar na consulta">
+      <h3><Sparkles aria-hidden="true" />Para lembrar com {(patient.socialName || patient.name).split(' ')[0]}</h3>
+      <dl>
+        {(compact ? filled.slice(0, 4) : filled).map(field => <div key={field.key}><dt>{field.label}</dt><dd>{patient.rapport?.[field.key]}</dd></div>)}
+      </dl>
+    </section>
   );
 }

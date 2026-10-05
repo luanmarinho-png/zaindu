@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { BadgeInfo, CalendarDays, Contact, HeartHandshake, House, IdCard, Loader2, Mail, Megaphone, NotebookPen, Phone, ShieldCheck, Trash2, User } from 'lucide-react';
+import { BadgeInfo, CalendarDays, Sparkles, Contact, HeartHandshake, House, IdCard, Loader2, Mail, Megaphone, NotebookPen, Phone, ShieldCheck, Trash2, User } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { ageFrom, digits, maskCep, maskCpf, maskPhone } from '@/lib/clinic/format';
-import { makeId, normalizePatient, type Patient } from '@/lib/clinic/store';
+import { makeId, normalizePatient, RAPPORT_FIELDS, type Patient } from '@/lib/clinic/store';
 
 const SEXES = ['Feminino', 'Masculino', 'Intersexo', 'Prefere não informar'];
 const SOURCES = ['Indicação de paciente', 'Indicação médica', 'Instagram', 'Google', 'Convênio', 'Site', 'Outro'];
@@ -147,6 +147,18 @@ export function PatientModal({ patient, onSave, onDelete, onClose }: Props) {
         </div>
       </fieldset>
 
+      <details className="z-fieldset z-rapport" open={RAPPORT_FIELDS.some(field => form.rapport?.[field.key])}>
+        <summary><Sparkles aria-hidden="true" />Conhecer o paciente<small>Para lembrar na consulta e encantar. Tudo opcional.</small></summary>
+        <div className="z-form-grid">
+          {RAPPORT_FIELDS.map((field, index) => (
+            <Field key={field.key} label={field.label} htmlFor={`r-${field.key}`} full={index === 0}>
+              {index === 0
+                ? <textarea id={`r-${field.key}`} className="z-textarea" rows={2} placeholder={field.placeholder} value={form.rapport?.[field.key] || ''} onChange={event => set('rapport', { ...form.rapport, [field.key]: event.target.value })} />
+                : <input id={`r-${field.key}`} className="z-input" placeholder={field.placeholder} value={form.rapport?.[field.key] || ''} onChange={event => set('rapport', { ...form.rapport, [field.key]: event.target.value })} />}
+            </Field>
+          ))}
+        </div>
+      </details>
       <fieldset className="z-fieldset">
         <legend><ShieldCheck aria-hidden="true" />Atendimento</legend>
         <div className="z-form-grid">

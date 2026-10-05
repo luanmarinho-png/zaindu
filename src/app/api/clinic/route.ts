@@ -1,15 +1,16 @@
 import type { Db } from 'mongodb';
 import { NextRequest, NextResponse } from 'next/server';
-import { brandOf, clinics, getAccess, states } from '@/lib/auth';
+import { brandOf, clinics, getAccess, members, states } from '@/lib/auth';
+import { describeChanges, recordAudit } from '@/lib/audit';
 import { getDatabase } from '@/lib/mongodb';
-import { canWrite, readableStore, STORE_KEYS, type Module } from '@/lib/clinic/permissions';
-import { serviceCost, type Service, type Store, type Supply } from '@/lib/clinic/store';
+import { canWrite, MAIN_PROFESSIONAL, readableStore, STORE_KEYS, type Module, type Professional } from '@/lib/clinic/permissions';
+import { findService, servicePrice, type Service, type Store, type Supply } from '@/lib/clinic/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const noStore = { 'Cache-Control': 'no-store' };
-const ARRAY_KEYS = new Set<keyof Store>(['patients', 'appointments', 'notes', 'media', 'services', 'supplies']);
+const ARRAY_KEYS = new Set<keyof Store>(['patients', 'appointments', 'notes', 'media', 'documents', 'services', 'supplies']);
 const NUMBER_KEYS = new Set<keyof Store>(['knowledgeCost', 'targetMargin']);
 
 function cleanStore(value: Record<string, unknown>) {
@@ -26,6 +27,7 @@ function cleanStore(value: Record<string, unknown>) {
     appointments: keepPatients(value.appointments),
     notes: keepPatients(value.notes),
     media: keepPatients(value.media),
+    documents: keepPatients(value.documents),
     profiles: Object.fromEntries(Object.entries(profiles).filter(([patientId]) => patientIds.has(patientId))),
   };
 }
@@ -49,6 +51,15 @@ async function guardPatients(database: Db, clinicId: string, modules: Module[], 
   return blocked.length ? 'Este paciente tem prontuário. Só quem tem acesso ao prontuário pode excluí-lo.' : list;
 }
 
+// Quem atende na clínica: o profissional principal (das Configurações) e as pessoas marcadas como profissionais na equipe.
+async function professionalsOf(database: Db, clinicId: string, settings: Record<string, unknown>): Promise<Professional[]> {
+  const team = await members(database).find({ clinicId, professional: { $exists: true } }, { projection: { name: 1, professional: 1 } }).sort({ name: 1 }).toArray();
+  return [
+    { id: MAIN_PROFESSIONAL, name: String(settings.professionalName || 'Profissional principal'), specialty: String(settings.specialty || ''), registry: String(settings.professionalRegistry || '') },
+    ...team.map(item => ({ id: item._id, name: item.name, specialty: item.professional?.specialty || '', registry: item.professional?.registry || '' })),
+  ];
+}
+
 // Quem não vê valores não pode mudá-los: consulta existente mantém o valor salvo; consulta nova recebe o preço sugerido do atendimento.
 async function keepPrices(database: Db, clinicId: string, next: Record<string, unknown>[]): Promise<Record<string, unknown>[]> {
   const current = ((await states(database).findOne({ _id: clinicId }, { projection: { 'data.appointments': 1, 'data.services': 1, 'data.supplies': 1, 'data.targetMargin': 1 } }))?.data || {}) as Record<string, unknown>;
@@ -57,8 +68,8 @@ async function keepPrices(database: Db, clinicId: string, next: Record<string, u
   const supplies = Array.isArray(current.supplies) ? current.supplies as Supply[] : [];
   const margin = Number(current.targetMargin) || 0;
   const suggested = (type: unknown) => {
-    const service = services.find(item => String(item.name).toLocaleLowerCase('pt-BR') === String(type || '').toLocaleLowerCase('pt-BR'));
-    return service ? Math.round(serviceCost(service, supplies) * (1 + margin / 100) * 100) / 100 : 0;
+    const service = findService(services, String(type || ''));
+    return service ? servicePrice(service, supplies, margin) : 0;
   };
   return next.map(item => ({ ...item, price: prices.has(idOf(item)) ? prices.get(idOf(item)) : suggested(item?.type) }));
 }
@@ -83,12 +94,14 @@ export async function GET() {
       const changed = Object.keys(clean).filter(key => JSON.stringify(clean[key as keyof typeof clean]) !== JSON.stringify(document.data[key]));
       if (changed.length) await states(database).updateOne({ _id: access.clinicId }, { $set: { ...Object.fromEntries(changed.map(key => [`data.${key}`, clean[key as keyof typeof clean]])), updatedAt: new Date() } });
     }
-    // Quem não tem o módulo nem recebe aquela parte dos dados; sem Financeiro, as consultas vão sem valor.
+    // Quem não tem o módulo nem recebe aquela parte dos dados; sem Financeiro, consultas e atendimentos vão sem valores.
     const visible = data && readableStore(data, access.modules);
-    if (visible && !access.modules.includes('financeiro') && Array.isArray(visible.appointments)) {
-      visible.appointments = visible.appointments.map(item => { const { price: _price, ...rest } = item as Record<string, unknown>; return rest; });
+    if (visible && !access.modules.includes('financeiro')) {
+      if (Array.isArray(visible.appointments)) visible.appointments = visible.appointments.map(item => { const { price: _price, ...rest } = item as Record<string, unknown>; return rest; });
+      if (Array.isArray(visible.services)) visible.services = (visible.services as Service[]).map(item => ({ id: item.id, name: item.name, duration: item.duration, knowledgeCost: 0, items: [] }));
     }
-    return NextResponse.json({ data: visible, brand: brandOf(clinic), access }, { headers: noStore });
+    const professionals = await professionalsOf(database, access.clinicId, (data?.settings || {}) as Record<string, unknown>);
+    return NextResponse.json({ data: visible, brand: brandOf(clinic), access, professionals, version: document?.updatedAt?.getTime() || 0 }, { headers: noStore });
   } catch {
     return NextResponse.json({ error: 'Não foi possível conectar ao MongoDB. Confira MONGODB_URI e MONGODB_DB na Vercel.' }, { status: 503, headers: noStore });
   }
@@ -110,6 +123,7 @@ export async function PUT(request: NextRequest) {
     if (invalid.length) return NextResponse.json({ error: 'Os dados da clínica estão incompletos.' }, { status: 400 });
     if (!sent.length) return NextResponse.json({ saved: true }, { headers: noStore });
     const database = await getDatabase();
+    const before = ((await states(database).findOne({ _id: access.clinicId }, { projection: Object.fromEntries([...sent, 'patients'].map(key => [`data.${key}`, 1])) }))?.data || {}) as Record<string, unknown>;
     if (sent.includes('patients')) {
       const guarded = await guardPatients(database, access.clinicId, access.modules, incoming.patients as Record<string, unknown>[]);
       if (typeof guarded === 'string') return NextResponse.json({ error: guarded }, { status: 403 });
@@ -121,6 +135,7 @@ export async function PUT(request: NextRequest) {
     const update: Record<string, unknown> = { updatedAt: new Date() };
     for (const key of sent) update[`data.${key}`] = incoming[key];
     await states(database).updateOne({ _id: access.clinicId }, { $set: update }, { upsert: true });
+    await recordAudit(database, access.clinicId, access, describeChanges(before, { ...before, ...incoming }, sent)).catch(() => {});
     return NextResponse.json({ saved: true }, { headers: noStore });
   } catch {
     return NextResponse.json({ error: 'Não foi possível salvar no MongoDB. Verifique a conexão e tente novamente.' }, { status: 503 });

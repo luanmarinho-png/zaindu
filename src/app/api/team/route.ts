@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { Db } from 'mongodb';
 import { adminEmails, clinics, emailFromLogin, isClinicEmail, memberModules, members, profilesOf, type MemberDoc } from '@/lib/auth';
 import { fail, noStore, readJson, teamScope as scope } from '@/lib/api';
+import { recordAudit } from '@/lib/audit';
 import { getDatabase } from '@/lib/mongodb';
 import { cleanModules, DEFAULT_MEMBER_MODULES, type AccessProfile } from '@/lib/clinic/permissions';
 import { removeLogin, upsertLogin, type LoginResult } from '@/lib/supabase/admin';
@@ -15,7 +16,16 @@ const view = (item: MemberDoc, profiles: AccessProfile[]) => ({
   email: item._id, username: item._id.replace(/@zaindu\.app$/, ''), name: item.name, role: item.role,
   profileId: item.profileId && profiles.some(profile => profile.id === item.profileId) ? item.profileId : '',
   modules: memberModules(item, profiles),
+  professional: item.professional || null,
 });
+
+// Profissional atende pacientes, tem agenda própria e assina documentos (registro = CRM/CRBM/COREN etc.).
+function professionalFrom(body: Record<string, unknown> | null): MemberDoc['professional'] | null {
+  const raw = body?.professional;
+  if (!raw || typeof raw !== 'object') return null;
+  const value = raw as Record<string, unknown>;
+  return { specialty: String(value.specialty || '').trim().slice(0, 80), registry: String(value.registry || '').trim().slice(0, 40) };
+}
 
 const clinicProfiles = async (db: Db, clinicId: string) => profilesOf(await clinics(db).findOne({ _id: clinicId }, { projection: { profiles: 1 } }));
 
@@ -74,8 +84,10 @@ export async function POST(request: NextRequest) {
     if (result === 'unconfigured') return fail('Falta a chave SUPABASE_SECRET_KEY no servidor para criar o login. Nada foi salvo.', 503);
     if (result instanceof Error) return fail(result.message.includes('password') ? 'Senha recusada pelo Supabase. Use uma senha mais forte.' : result.message, 400);
     const now = new Date();
-    const doc: MemberDoc = { _id: email, clinicId: target.clinicId, role, name, modules: chosen.modules, ...(chosen.profileId ? { profileId: chosen.profileId } : {}), createdAt: now, updatedAt: now };
+    const professional = professionalFrom(body);
+    const doc: MemberDoc = { _id: email, clinicId: target.clinicId, role, name, modules: chosen.modules, ...(chosen.profileId ? { profileId: chosen.profileId } : {}), ...(professional ? { professional } : {}), createdAt: now, updatedAt: now };
     await members(db).insertOne(doc);
+    await recordAudit(db, target.clinicId, target.access, [`Pessoa adicionada à equipe: ${name} (${role === 'manager' ? 'gestora' : profiles.find(item => item.id === chosen.profileId)?.name || 'personalizado'})`]).catch(() => {});
     return NextResponse.json({ member: view(doc, profiles), login: result, message: loginMessage(result) }, { status: 201, headers: noStore });
   } catch {
     return fail('Não foi possível salvar o usuário.', 503);
@@ -99,12 +111,21 @@ export async function PATCH(request: NextRequest) {
       if (!name) return fail('Informe o nome.', 400);
       update.name = name;
     }
-    let unset = false;
+    const unset: Record<string, ''> = {};
+    const changes: string[] = [];
+    if (body && 'professional' in body) {
+      const professional = professionalFrom(body);
+      if (professional) update.professional = professional; else unset.professional = '';
+      changes.push(professional ? 'marcada como profissional' : 'deixou de ser profissional');
+    }
+    // Desconectar: toda sessão aberta antes de agora deixa de valer (também acontece ao trocar a senha).
+    if (body?.revoke === true) { update.sessionsValidAfter = new Date(); changes.push('desconectada de todos os aparelhos'); }
     if (body && ('modules' in body || 'profileId' in body)) {
       const chosen = accessFrom(body, await clinicProfiles(db, target.clinicId));
       if (typeof chosen === 'string') return fail(chosen, 400);
       update.modules = chosen.modules;
-      if (chosen.profileId) update.profileId = chosen.profileId; else unset = true;
+      if (chosen.profileId) update.profileId = chosen.profileId; else unset.profileId = '';
+      changes.push('acesso alterado');
     }
     if (isAdmin && (body?.role === 'manager' || body?.role === 'member')) update.role = body.role;
     let message = 'Alterações salvas.';
@@ -113,9 +134,13 @@ export async function PATCH(request: NextRequest) {
       if (password.length < MIN_PASSWORD) return fail(`A senha precisa de pelo menos ${MIN_PASSWORD} caracteres.`, 400);
       const result = await upsertLogin(email, password, update.name || member.name).catch((error: Error) => error);
       if (result instanceof Error) return fail('Senha recusada pelo Supabase. Use uma senha mais forte.', 400);
-      message = loginMessage(result);
+      message = `${loginMessage(result)} Sessões abertas em outros aparelhos foram encerradas.`;
+      update.sessionsValidAfter = new Date();
+      changes.push('senha trocada');
     }
-    await members(db).updateOne({ _id: email }, { $set: update, ...(unset ? { $unset: { profileId: '' as const } } : {}) });
+    await members(db).updateOne({ _id: email }, { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
+    if (changes.length) await recordAudit(db, target.clinicId, target.access, [`${update.name || member.name}: ${changes.join(', ')}`]).catch(() => {});
+    if (body?.revoke === true && !password) message = `${member.name} foi desconectada de todos os aparelhos.`;
     return NextResponse.json({ saved: true, message }, { headers: noStore });
   } catch {
     return fail('Não foi possível salvar o usuário.', 503);
@@ -136,6 +161,7 @@ export async function DELETE(request: NextRequest) {
     // Sem o vínculo o login já não abre nenhuma clínica; apagar o login no Supabase é limpeza extra.
     await members(db).deleteOne({ _id: email });
     await removeLogin(email).catch(() => {});
+    await recordAudit(db, target.clinicId, target.access, [`Pessoa removida da equipe: ${member.name}`]).catch(() => {});
     return NextResponse.json({ removed: true }, { headers: noStore });
   } catch {
     return fail('Não foi possível remover o usuário.', 503);

@@ -15,6 +15,8 @@
   --sc-ink-muted: #6b6b6b;
   --sc-ink-subtle: #ababab;
   --sc-surface: #f4f4f5;
+  /* Fundo da página um tom abaixo das caixas, para os cartões se destacarem (também com a cor clara da clínica). */
+  --sc-page: color-mix(in srgb, var(--sc-surface) 93%, #1c1d20);
   --sc-card: #ffffff;
   --sc-soft: oklch(96.1% 0 0);
   --sc-border: rgba(28, 29, 32, 0.08);
@@ -56,7 +58,7 @@
 }
 
 html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-size-adjust: 100%; }
-body { margin: 0; background: var(--sc-surface); color: var(--sc-ink); font: 400 14px/1.5 var(--sc-font); }
+body { margin: 0; background: var(--sc-page); color: var(--sc-ink); font: 400 14px/1.5 var(--sc-font); }
 * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--sc-ink-muted) 42%, transparent) transparent; }
 h1, h2, h3 { text-wrap: balance; }
 button, [role='button'], summary { touch-action: manipulation; }

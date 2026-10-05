@@ -3,7 +3,8 @@ export type FieldType = 'text' | 'textarea' | 'date' | 'select' | 'checklist';
 export type TemplateField = { key: string; label: string; type: FieldType; placeholder?: string; options?: string[]; wide?: boolean };
 export type RecordSection = { id: string; title: string; fields: TemplateField[]; custom?: boolean };
 export type TemplateId = 'tricologia' | 'dermatologia' | 'geral';
-export type RecordConfig = { template: TemplateId; anamnesis: TemplateField[]; sections: RecordSection[] };
+// edited: a clínica personalizou o prontuário inteiro (perguntas do modelo inclusive); vale o que está salvo.
+export type RecordConfig = { template: TemplateId; anamnesis: TemplateField[]; sections: RecordSection[]; edited?: boolean };
 
 export const FIELD_TYPES: Record<FieldType, string> = { text: 'Texto curto', textarea: 'Texto longo', date: 'Data', select: 'Lista de opções', checklist: 'Checklist' };
 
@@ -169,6 +170,7 @@ export const recordFromTemplate = (id: TemplateId): RecordConfig => structuredCl
 // Junta as etapas próprias da clínica ao modelo atual, para que melhorias no modelo cheguem a quem já o usa.
 export function resolveRecord(record: Partial<RecordConfig> | undefined): RecordConfig {
   const template = isTemplateId(record?.template) ? record.template : 'tricologia';
+  if (record?.edited && Array.isArray(record.anamnesis) && Array.isArray(record.sections)) return { template, anamnesis: record.anamnesis, sections: record.sections, edited: true };
   const base = recordFromTemplate(template);
   const custom = (record?.sections || []).filter(section => section.custom);
   return { template, anamnesis: base.anamnesis, sections: [...base.sections, ...custom] };
