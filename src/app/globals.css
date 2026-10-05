@@ -100,6 +100,9 @@ html, body { font-family: var(--sc-font); background: var(--sc-surface); color: 
 }
 .eyebrow { letter-spacing: 1.6px; }
 .brandMark { background: var(--sc-brand); }
+.brandMark{width:42px;height:42px;object-fit:contain;border-radius:13px;flex:none}
+.brand strong{font-size:19px;letter-spacing:.09em;font-weight:700;color:var(--sc-ink)}
+.brand small{font-size:8px;letter-spacing:1.15px}
 .miniIcon.sand { background: rgba(146,118,90,.11); color: #826747; }
 @media(max-width:680px) {
   .pageHeading:after { width: 52%; opacity: .4; }
@@ -116,6 +119,41 @@ html, body { font-family: var(--sc-font); background: var(--sc-surface); color: 
 /* Tipografia unificada com o Design System SC */
 html, body, button, input, select, textarea { font-family: var(--sc-font); }
 .dailyHighlight{justify-content:flex-start}.dailyHighlight>div{flex:1}.dailyFooter{font-family:var(--sc-font);font-style:normal;font-size:14px}
+.view-home .appointmentsPanel,.view-home .dailyHighlight{grid-column:auto}
+.view-home .dailyHighlight{height:100%;min-height:100%;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:18px;padding:22px;background:linear-gradient(145deg,#f1f3eb,#fffefa)}
+.view-home .dailyHighlight>div{position:relative;z-index:1}
+.view-home .dailyHighlight h2{font-size:clamp(24px,2.4vw,34px);line-height:1.1}
+.view-home .dailyHighlight p{max-width:36ch}
+.upcomingList{display:grid;gap:7px;margin-top:14px}
+.upcomingItem{display:grid;grid-template-columns:40px minmax(0,1fr) auto auto;align-items:center;gap:10px;padding:10px 8px;border-top:1px solid var(--line)}
+.upcomingDate b,.upcomingDate small,.upcomingPatient strong,.upcomingPatient small{display:block}
+.upcomingDate b{font:600 20px var(--sc-font);color:var(--vital)}
+.upcomingDate small,.upcomingPatient small{font-size:10px;color:var(--muted);margin-top:3px}
+.upcomingPatient{min-width:0}
+.upcomingPatient strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.appointmentStatus{font-size:9px;white-space:nowrap;border-radius:999px;padding:5px 8px;background:#eff1e8;color:var(--vital)}
+.status-realizada{background:#e7f1e8;color:#3f704f}.status-cancelada{background:#f6e9e6;color:#a53e38}
+.clinicIdentityForm{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0 20px}
+.clinicIdentityForm label,.accessForm label{display:grid;gap:6px;font-size:11px;font-weight:700;color:var(--ebano)}
+.clinicIdentityForm input,.accessForm input{height:42px;min-width:0;border:1px solid var(--line);border-radius:9px;padding:0 11px;background:#fffefa;font:13px var(--sc-font);color:var(--ebano)}
+.syncErrorDot{background:#a53e38}
+.accessShell{min-height:100dvh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at top right,#eee9dc,transparent 55%),var(--sc-surface)}
+.accessCard{width:min(100%,460px);padding:32px;border:1px solid var(--line);border-radius:22px;background:var(--white);box-shadow:0 20px 70px #28291d16}
+.accessBrand{display:flex;align-items:center;gap:11px;margin-bottom:30px}
+.accessBrand img{width:46px;height:46px;border-radius:14px}
+.accessBrand strong,.accessBrand small{display:block}.accessBrand strong{font-size:19px;letter-spacing:.12em}.accessBrand small{font-size:9px;letter-spacing:1.5px;color:var(--muted)}
+.accessCard h1{font:500 30px var(--sc-font);margin:0 0 8px;color:var(--ebano)}
+.accessCard>p{font-size:13px;line-height:1.6;color:var(--muted)}.accessCard code{font-size:12px}
+.accessForm{display:grid;gap:14px;margin-top:20px}.accessForm .button{min-height:44px}
+.accessError{margin:0;color:#a53e38;font-size:12px}
+@media(max-width:760px){
+  .view-home .appointmentsPanel,.view-home .dailyHighlight{grid-column:1/-1}
+  .view-home .dailyHighlight{min-height:210px}
+  .upcomingItem{grid-template-columns:40px minmax(0,1fr) auto;gap:8px}
+  .upcomingItem>.textButton{grid-column:2/-1;justify-self:start}
+  .clinicIdentityForm{grid-template-columns:minmax(0,1fr)}
+  .accessCard{padding:24px 20px}
+}
 
 /* Navegação e conteúdo confortáveis em telas touch */
 .mobileNavBackdrop{display:none}
@@ -126,6 +164,10 @@ html, body, button, input, select, textarea { font-family: var(--sc-font); }
   .shell.mobileNavOpen .sidebar{transform:translateX(0)}
   .sidebar .brand,.sidebar .workspace,.sidebar .navLabel,.sidebar .sideTip,.sidebar .sidebarFoot{display:flex}
   .sidebar .navLabel{display:block}
+  .sidebarCollapsed .sidebar .brand>div:last-child,.sidebarCollapsed .sidebar .workspace>div,.sidebarCollapsed .sidebar .navLabel,.sidebarCollapsed .sidebar .navItem{font-size:inherit;visibility:visible}
+  .sidebarCollapsed .sidebar .brand>div:last-child{font-size:initial}
+  .sidebarCollapsed .sidebar .workspace{justify-content:flex-start;padding:12px}
+  .sidebarCollapsed .sidebar .navItem{justify-content:flex-start;padding:0 12px}
   .sideNav{display:grid;gap:5px;overflow:visible}
   .navItem{min-height:46px;height:auto;padding:0 12px;font-size:14px;gap:10px}
   .navItem .navIcon{font-size:17px}

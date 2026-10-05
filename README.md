@@ -1,6 +1,6 @@
-# Raiz Viva · Gestão da clínica
+# NÓRIA · Gestão clínica
 
-Front-end em Next.js/React para organização mensal da clínica de tricologia. O planejamento anexado serviu de referência para a paleta visual e o resumo financeiro (receitas, custo fixo e parcelas); o painel anterior era limitado a novembro de 2026, então esta versão permite navegar por mês, cadastrar pacientes e registrar consultas.
+Plataforma inicial de gestão clínica, pensada para ser personalizada por especialidade e por profissional. A identidade NÓRIA é universal; cada clínica configura seu nome, responsável, especialidade, preferências de comunicação, tipos de atendimento e formulários pertinentes.
 
 ## Rodar localmente
 
@@ -22,19 +22,17 @@ Abra http://localhost:3000. O script já fixa a porta 3000. Como a instalação 
 - Registro descritivo de tricoscopia por região, aparelho/aumento, métricas e referência fotográfica.
 - Visão mensal de consultas, pacientes e receita realizada.
 - Campos editáveis de custos fixos e parcelas/investimentos.
-- Persistência local via `localStorage` para prototipagem.
-- Base TypeScript e variáveis de ambiente de exemplo para futura conexão com MongoDB.
-- Fundação visual do Design System SC, com tokens e componentes CSS adaptados à identidade Raiz Viva (oliva, marfim e grafite).
+- Persistência da ficha, agenda e evoluções no MongoDB; imagens privadas no GridFS.
+- Preferência individual de comunicação, identidade e especialidade configuráveis por clínica.
+- Fundação visual do Design System SC, com tipografia e componentes universais para diferentes especialidades.
 - Acabamento do hero com textura marmorizada marrom sutil, sem imagem externa.
 
-O Design System está em `src/app/design-system.css`, importado antes dos estilos do produto em `src/app/layout.tsx`. Os tokens originais vermelhos/cinza do pacote SocialCof foram mapeados para a paleta da clínica; as primitivas `.sc-*` podem ser reutilizadas em novos componentes.
+O Design System está em `src/app/design-system.css`, importado antes dos estilos do produto em `src/app/layout.tsx`. A marca usa um símbolo vetorial próprio em `public/noria-mark.svg` e uma paleta premium neutra.
 
 ## Próximos passos sugeridos
 
-1. Definir autenticação e perfis de acesso antes de guardar dados reais de pacientes.
-2. Migrar pacientes, consultas e lançamentos financeiros para coleções MongoDB com validação no servidor.
-3. Incluir histórico clínico, lembretes de retorno, confirmação de consulta, pagamentos/pendências e relatórios por procedimento.
-4. Configurar `MONGODB_URI` na Vercel, revisão de privacidade/LGPD e política de backup.
-5. Criar o repositório GitHub e conectar a Vercel após a revisão do front.
+1. Configure `MONGODB_URI`, `MONGODB_DB` e `CLINIC_ACCESS_PASSWORD` nos ambientes local e Vercel. Use segredos fortes e nunca os envie ao GitHub.
+2. MongoDB guarda os dados da clínica; GridFS guarda fotos privadas, fora dos documentos clínicos. A sessão é protegida por senha e cookie HttpOnly.
+3. Antes de uso real, configure backups, retenção, perfis de acesso e demais controles de privacidade aplicáveis à operação médica.
 
-Os registros iniciais são exemplos para demonstração. Esta versão não sincroniza entre dispositivos nem deve ser usada para armazenar informações clínicas reais.
+O banco começa sem pacientes nem consultas de demonstração. A primeira abertura, após configurar o acesso e o MongoDB, migra eventuais registros locais existentes, removendo exemplos de demonstração e preservando os cadastros reais.

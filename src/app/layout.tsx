@@ -3,8 +3,8 @@ import './design-system.css';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Raiz Viva | Gestão da clínica',
-  description: 'Organização mensal de pacientes, consultas e financeiro da clínica.',
+  title: 'NÓRIA | Gestão clínica',
+  description: 'Plataforma de gestão clínica personalizável para profissionais da saúde.',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
