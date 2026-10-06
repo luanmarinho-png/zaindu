@@ -127,7 +127,8 @@ export function documentHtml(document: ClinicalDocument, patient: Patient, setti
   .contacts.on-color { color: #fff; }
   .contacts span { display: inline-flex; align-items: flex-start; gap: 6px; }
   .contacts em { font-style: normal; }
-  .contacts.right span { justify-content: flex-end; }
+  .contacts.right span { display: block; text-align: right; }
+  .contacts.right svg { display: inline-block; vertical-align: -1px; margin: 0 5px 0 0; }
   .contacts svg { width: 11px; height: 11px; flex: none; margin-top: 3px; color: ${color}; }
   .contacts.on-color svg { color: #fff; }
   .watermark { position: fixed; opacity: .06; z-index: 0; pointer-events: none; }

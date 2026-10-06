@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, BadgeCheck, Building2, ClipboardList, Eye, History, ImagePlus, ListChecks, Palette, Plus, RotateCcw, Stethoscope, Trash2, UserRound, Users, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, BadgeCheck, ChevronRight, Building2, ClipboardList, Eye, History, ImagePlus, ListChecks, Palette, Plus, RotateCcw, Stethoscope, Trash2, UserRound, Users, X } from 'lucide-react';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
@@ -162,13 +162,26 @@ const move = <T,>(list: T[], index: number, delta: number) => {
 function RecordEditor({ record, findings, onChange }: { record: RecordConfig; findings: string[]; onChange: (record: RecordConfig) => void }) {
   const [preview, setPreview] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const groups: RecordSection[] = [{ id: '__anamnese', title: 'Anamnese', fields: record.anamnesis }, ...record.sections];
-  const commit = (next: RecordSection[]) => {
-    const [anamnesis, ...sections] = next;
-    onChange({ template: record.template, anamnesis: anamnesis.fields, sections, edited: true });
+  const save = (patch: Partial<RecordConfig>) => onChange({ template: record.template, anamnesis: record.anamnesis, sections: record.sections, ...patch, edited: true });
+  const setAnamnesis = (anamnesis: TemplateField[]) => save({ anamnesis });
+  const setSections = (sections: RecordSection[]) => save({ sections });
+  const categories = groupFields(record.anamnesis);
+
+  // Move a pergunta para cima/baixo dentro da própria categoria (a ordem geral da anamnese é preservada).
+  const moveInGroup = (key: string, delta: number) => {
+    const field = record.anamnesis.find(item => item.key === key);
+    if (!field) return;
+    const siblings = record.anamnesis.map((item, index) => ({ item, index })).filter(entry => fieldGroup(entry.item) === fieldGroup(field));
+    const at = siblings.findIndex(entry => entry.item.key === key);
+    const target = siblings[at + delta];
+    if (!target) return;
+    const next = [...record.anamnesis];
+    [next[siblings[at].index], next[target.index]] = [next[target.index], next[siblings[at].index]];
+    setAnamnesis(next);
   };
-  const patchGroup = (index: number, patch: Partial<RecordSection>) => commit(groups.map((group, i) => i === index ? { ...group, ...patch } : group));
-  const patchField = (index: number, key: string, patch: Partial<TemplateField>) => patchGroup(index, { fields: groups[index].fields.map(field => field.key === key ? { ...field, ...patch } : field) });
+  const patchAnamnesis = (key: string, patch: Partial<TemplateField>) => setAnamnesis(record.anamnesis.map(item => item.key === key ? { ...item, ...patch } : item));
+  const renameCategory = (from: string, to: string) => setAnamnesis(record.anamnesis.map(item => fieldGroup(item) === from ? { ...item, group: to } : item));
+  const patchSection = (id: string, patch: Partial<RecordSection>) => setSections(record.sections.map(section => section.id === id ? { ...section, ...patch } : section));
 
   return (
     <>
@@ -176,7 +189,7 @@ function RecordEditor({ record, findings, onChange }: { record: RecordConfig; fi
         <header className="z-section-head">
           <div>
             <h2 className="t-h1"><ClipboardList aria-hidden="true" className="z-inline-icon" />Perguntas do prontuário</h2>
-            <p className="t-body t-muted">Modelo base: {TEMPLATES[record.template].name}{record.edited ? ', personalizado pela clínica' : ''}. Renomeie, reordene, troque o tipo ou crie perguntas e etapas.</p>
+            <p className="t-body t-muted">Modelo base: {TEMPLATES[record.template].name}{record.edited ? ', personalizado pela clínica' : ''}. Abra uma categoria ou etapa e clique numa pergunta para editar.</p>
           </div>
           <div className="z-row-actions">
             <button type="button" className="z-btn secondary" onClick={() => setPreview(true)}><Eye />Ver como fica</button>
@@ -185,45 +198,71 @@ function RecordEditor({ record, findings, onChange }: { record: RecordConfig; fi
               : <button type="button" className="z-btn ghost" onClick={() => setConfirmReset(true)}><RotateCcw />Restaurar modelo</button>)}
           </div>
         </header>
+
         <datalist id="anamnesis-groups">{ANAMNESIS_GROUPS.map(item => <option key={item} value={item} />)}</datalist>
-        <ol className="z-steps">
-          {groups.map((group, index) => (
-            <li key={group.id} className="z-step custom">
-              <div className="z-step-head">
-                {index === 0 ? <strong className="z-step-fixed">Anamnese<small className="t-muted">Preenchida uma vez e atualizada ao longo do acompanhamento</small></strong>
-                  : <input className="z-input" value={group.title} onChange={event => patchGroup(index, { title: event.target.value })} aria-label="Nome da etapa" placeholder="Nome da etapa" />}
-                {index > 0 && (
-                  <div className="z-row-actions">
-                    <button type="button" className="z-close" disabled={index === 1} onClick={() => commit([groups[0], ...move(groups.slice(1), index - 1, -1)])} aria-label="Subir etapa"><ArrowUp /></button>
-                    <button type="button" className="z-close" disabled={index === groups.length - 1} onClick={() => commit([groups[0], ...move(groups.slice(1), index - 1, 1)])} aria-label="Descer etapa"><ArrowDown /></button>
-                    <button type="button" className="z-btn danger-ghost sm" onClick={() => commit(groups.filter((_, i) => i !== index))}><Trash2 />Remover etapa</button>
-                  </div>
-                )}
+        <div className="z-qblock">
+          <div className="z-qblock-head">
+            <div><h3 className="t-h2">Anamnese</h3><p className="t-body t-muted">Preenchida uma vez e atualizada ao longo do acompanhamento. {record.anamnesis.length} perguntas em {categories.length} categorias.</p></div>
+            <button type="button" className="z-btn ghost sm" onClick={() => setAnamnesis([...record.anamnesis, { ...newField(), group: 'Nova categoria' }])}><Plus />Nova categoria</button>
+          </div>
+          {categories.map(category => (
+            <details key={category.title} className="z-qgroup">
+              <summary>
+                <ChevronRight className="z-chevron" aria-hidden="true" />
+                <strong>{category.title}</strong>
+                <span className="z-badge sm num">{category.fields.length}</span>
+              </summary>
+              <div className="z-qgroup-body">
+                <div className="z-qgroup-tools">
+                  <input className="z-input" defaultValue={category.title} aria-label="Nome da categoria" onBlur={event => event.target.value.trim() && event.target.value !== category.title && renameCategory(category.title, event.target.value.trim())} />
+                  <button type="button" className="z-btn ghost sm" onClick={() => setAnamnesis([...record.anamnesis, { ...newField(), group: category.title }])}><Plus />Adicionar pergunta</button>
+                </div>
+                <ol className="z-qlist">
+                  {category.fields.map((field, index) => (
+                    <QuestionRow key={field.key} field={field} index={index} total={category.fields.length} canRemove={record.anamnesis.length > 1}
+                      onPatch={patch => patchAnamnesis(field.key, patch)} onMove={delta => moveInGroup(field.key, delta)}
+                      onRemove={() => setAnamnesis(record.anamnesis.filter(item => item.key !== field.key))} categoryInput />
+                  ))}
+                </ol>
               </div>
-              <ul className="z-step-fields">
-                {group.fields.map((field, fieldIndex) => (
-                  <li key={field.key}>
-                    <div className="z-step-label">
-                      <input className="z-input" value={field.label} onChange={event => patchField(index, field.key, { label: event.target.value })} placeholder="Pergunta" aria-label="Pergunta" />
-                      {index === 0 && <input className="z-input z-step-group" list="anamnesis-groups" value={field.group ?? fieldGroup(field)} onChange={event => patchField(index, field.key, { group: event.target.value })} aria-label="Categoria da pergunta" title="Categoria" />}
-                    </div>
-                    <Select value={field.type} ariaLabel="Tipo de resposta" onChange={value => patchField(index, field.key, { type: value as FieldType })} options={(Object.keys(FIELD_TYPES) as FieldType[]).map(type => ({ value: type, label: FIELD_TYPES[type] }))} />
-                    {(field.type === 'select' || field.type === 'checklist')
-                      ? <input className="z-input z-step-options" value={(field.options || []).join(', ')} onChange={event => patchField(index, field.key, { options: event.target.value.split(',').map(item => item.trimStart()) })} onBlur={event => patchField(index, field.key, { options: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })} placeholder="Opções separadas por vírgula" aria-label="Opções" />
-                      : <input className="z-input z-step-options" value={field.placeholder || ''} onChange={event => patchField(index, field.key, { placeholder: event.target.value })} placeholder="Texto de ajuda (opcional)" aria-label="Texto de ajuda" />}
-                    <div className="z-row-actions">
-                      <button type="button" className="z-close" disabled={fieldIndex === 0} onClick={() => patchGroup(index, { fields: move(group.fields, fieldIndex, -1) })} aria-label="Subir pergunta"><ArrowUp /></button>
-                      <button type="button" className="z-close" disabled={fieldIndex === group.fields.length - 1} onClick={() => patchGroup(index, { fields: move(group.fields, fieldIndex, 1) })} aria-label="Descer pergunta"><ArrowDown /></button>
-                      <button type="button" className="z-close" onClick={() => patchGroup(index, { fields: group.fields.filter(item => item.key !== field.key) })} aria-label="Remover pergunta" disabled={group.fields.length === 1}><X /></button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-              <button type="button" className="z-btn ghost sm" onClick={() => patchGroup(index, { fields: [...group.fields, newField()] })}><Plus />Adicionar pergunta</button>
-            </li>
+            </details>
           ))}
-        </ol>
-        <button type="button" className="z-card flat z-add-card" onClick={() => commit([...groups, { id: `etapa-${makeId().slice(0, 8)}`, title: 'Nova etapa', custom: true, fields: [newField()] }])}><Plus aria-hidden="true" /><span>Adicionar etapa à evolução</span></button>
+        </div>
+
+        <div className="z-qblock">
+          <div className="z-qblock-head">
+            <div><h3 className="t-h2">Evolução</h3><p className="t-body t-muted">Etapas preenchidas a cada consulta, na ordem abaixo.</p></div>
+            <button type="button" className="z-btn ghost sm" onClick={() => setSections([...record.sections, { id: `etapa-${makeId().slice(0, 8)}`, title: 'Nova etapa', custom: true, fields: [newField()] }])}><Plus />Nova etapa</button>
+          </div>
+          {record.sections.map((section, sectionIndex) => (
+            <details key={section.id} className="z-qgroup">
+              <summary>
+                <ChevronRight className="z-chevron" aria-hidden="true" />
+                <strong>{section.title || 'Etapa sem nome'}</strong>
+                <span className="z-badge sm num">{section.fields.length}</span>
+              </summary>
+              <div className="z-qgroup-body">
+                <div className="z-qgroup-tools">
+                  <input className="z-input" value={section.title} aria-label="Nome da etapa" onChange={event => patchSection(section.id, { title: event.target.value })} />
+                  <div className="z-row-actions">
+                    <button type="button" className="z-close" disabled={sectionIndex === 0} onClick={() => setSections(move(record.sections, sectionIndex, -1))} aria-label="Subir etapa" title="Subir etapa"><ArrowUp /></button>
+                    <button type="button" className="z-close" disabled={sectionIndex === record.sections.length - 1} onClick={() => setSections(move(record.sections, sectionIndex, 1))} aria-label="Descer etapa" title="Descer etapa"><ArrowDown /></button>
+                    <button type="button" className="z-btn ghost sm" onClick={() => patchSection(section.id, { fields: [...section.fields, newField()] })}><Plus />Pergunta</button>
+                    <button type="button" className="z-btn danger-ghost sm" onClick={() => setSections(record.sections.filter(item => item.id !== section.id))}><Trash2 />Remover etapa</button>
+                  </div>
+                </div>
+                <ol className="z-qlist">
+                  {section.fields.map((field, index) => (
+                    <QuestionRow key={field.key} field={field} index={index} total={section.fields.length} canRemove={section.fields.length > 1}
+                      onPatch={patch => patchSection(section.id, { fields: section.fields.map(item => item.key === field.key ? { ...item, ...patch } : item) })}
+                      onMove={delta => patchSection(section.id, { fields: move(section.fields, index, delta) })}
+                      onRemove={() => patchSection(section.id, { fields: section.fields.filter(item => item.key !== field.key) })} />
+                  ))}
+                </ol>
+              </div>
+            </details>
+          ))}
+        </div>
       </section>
       {preview && (
         <Modal size="lg" variant="drawer" title="Como fica o prontuário" description="Pré-visualização com as perguntas atuais. Nada é salvo aqui." onClose={() => setPreview(false)}>
@@ -393,4 +432,38 @@ function Paper({ title, html }: { title: string; html: string }) {
     return () => observer.disconnect();
   }, []);
   return <span ref={ref} className="z-letterhead-paper"><iframe title={title} srcDoc={html} tabIndex={-1} aria-hidden="true" style={{ transform: `scale(${scale})` }} /></span>;
+}
+
+// Uma pergunta: linha resumida (nome e tipo); ao clicar, abre os campos de edição.
+function QuestionRow({ field, index, total, canRemove, onPatch, onMove, onRemove, categoryInput }: {
+  field: TemplateField; index: number; total: number; canRemove: boolean; categoryInput?: boolean;
+  onPatch: (patch: Partial<TemplateField>) => void; onMove: (delta: number) => void; onRemove: () => void;
+}) {
+  const withOptions = field.type === 'select' || field.type === 'checklist';
+  return (
+    <li>
+      <details className="z-question">
+        <summary>
+          <span className="z-question-n num">{index + 1}</span>
+          <span className="z-question-label">{field.label || 'Pergunta sem nome'}</span>
+          <span className="z-badge sm">{FIELD_TYPES[field.type]}</span>
+          <span className="z-row-actions" onClick={event => event.preventDefault()}>
+            <button type="button" className="z-close" disabled={index === 0} onClick={() => onMove(-1)} aria-label="Subir pergunta" title="Subir"><ArrowUp /></button>
+            <button type="button" className="z-close" disabled={index === total - 1} onClick={() => onMove(1)} aria-label="Descer pergunta" title="Descer"><ArrowDown /></button>
+          </span>
+        </summary>
+        <div className="z-question-body">
+          <Field label="Pergunta" full htmlFor={`q-${field.key}`}><input id={`q-${field.key}`} className="z-input" value={field.label} onChange={event => onPatch({ label: event.target.value })} /></Field>
+          <Field label="Tipo de resposta"><Select value={field.type} ariaLabel="Tipo de resposta" onChange={value => onPatch({ type: value as FieldType })} options={(Object.keys(FIELD_TYPES) as FieldType[]).map(type => ({ value: type, label: FIELD_TYPES[type] }))} /></Field>
+          {categoryInput && <Field label="Categoria" htmlFor={`g-${field.key}`}><input id={`g-${field.key}`} className="z-input" list="anamnesis-groups" defaultValue={fieldGroup(field)} onBlur={event => event.target.value.trim() && event.target.value !== fieldGroup(field) && onPatch({ group: event.target.value.trim() })} /></Field>}
+          {withOptions
+            ? <Field label="Opções" full hint="Separe por vírgula." htmlFor={`o-${field.key}`}><input id={`o-${field.key}`} className="z-input" value={(field.options || []).join(', ')} onChange={event => onPatch({ options: event.target.value.split(',').map(item => item.trimStart()) })} onBlur={event => onPatch({ options: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })} /></Field>
+            : <Field label="Texto de ajuda" full hint="Aparece dentro do campo, em cinza." htmlFor={`h-${field.key}`}><input id={`h-${field.key}`} className="z-input" value={field.placeholder || ''} onChange={event => onPatch({ placeholder: event.target.value })} /></Field>}
+          <div className="z-question-foot">
+            <button type="button" className="z-btn danger-ghost sm" disabled={!canRemove} onClick={onRemove}><Trash2 />Remover pergunta</button>
+          </div>
+        </div>
+      </details>
+    </li>
+  );
 }
