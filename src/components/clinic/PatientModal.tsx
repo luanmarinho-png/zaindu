@@ -6,6 +6,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { ageFrom, digits, maskCep, maskCpf, maskPhone } from '@/lib/clinic/format';
 import { makeId, normalizePatient, RAPPORT_FIELDS, type Patient } from '@/lib/clinic/store';
+import { Select } from '@/components/ui/Select';
 
 const SEXES = ['Feminino', 'Masculino', 'Intersexo', 'Prefere não informar'];
 const SOURCES = ['Indicação de paciente', 'Indicação médica', 'Instagram', 'Google', 'Convênio', 'Site', 'Outro'];
@@ -79,10 +80,7 @@ export function PatientModal({ patient, onSave, onDelete, onClose }: Props) {
             <input id="p-birth" className="z-input" type="date" max={new Date().toISOString().slice(0, 10)} value={form.birthDate} onChange={event => set('birthDate', event.target.value)} />
           </Field>
           <Field label="Sexo" htmlFor="p-sex">
-            <select id="p-sex" className="z-select" value={form.sex} onChange={event => set('sex', event.target.value)}>
-              <option value="">Não informado</option>
-              {SEXES.map(item => <option key={item}>{item}</option>)}
-            </select>
+            <Select id="p-sex" value={form.sex} ariaLabel="Sexo" onChange={value => set('sex', value)} options={[{ value: '', label: 'Não informado' }, ...SEXES.map(item => ({ value: item, label: item }))]} />
           </Field>
           <Field label="CPF" icon={IdCard} htmlFor="p-cpf" error={submitted && cpfInvalid ? 'CPF precisa ter 11 dígitos.' : undefined}>
             <input id="p-cpf" className="z-input num" inputMode="numeric" placeholder="000.000.000-00" value={form.cpf} onChange={event => set('cpf', maskCpf(event.target.value))} aria-invalid={submitted && cpfInvalid} />
@@ -176,10 +174,7 @@ export function PatientModal({ patient, onSave, onDelete, onClose }: Props) {
             </Field>
           </>}
           <Field label="Como conheceu a clínica" icon={Megaphone} htmlFor="p-src">
-            <select id="p-src" className="z-select" value={form.referralSource} onChange={event => set('referralSource', event.target.value)}>
-              <option value="">Não informado</option>
-              {SOURCES.map(item => <option key={item}>{item}</option>)}
-            </select>
+            <Select id="p-src" value={form.referralSource} ariaLabel="Como conheceu a clínica" onChange={value => set('referralSource', value)} options={[{ value: '', label: 'Não informado' }, ...SOURCES.map(item => ({ value: item, label: item }))]} />
           </Field>
           <Field label="Paciente desde" icon={CalendarDays} htmlFor="p-since">
             <input id="p-since" className="z-input" type="date" value={form.since} onChange={event => set('since', event.target.value)} />

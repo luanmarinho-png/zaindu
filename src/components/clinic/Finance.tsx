@@ -1,13 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import { BarChart3, CalendarCheck, ChevronDown, Clock, Package, Percent, PiggyBank, Plus, Receipt, Tag, Trash2, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
+import { BarChart3, CalendarCheck, ChevronDown, Clock, Copy, Package, Percent, PiggyBank, Plus, Receipt, Repeat, Tag, Trash2, TrendingDown, TrendingUp, Wallet } from 'lucide-react';
 import { BarList, ColumnChart, SERIES } from '@/components/ui/Charts';
 import { DecimalInput } from '@/components/ui/DecimalInput';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { brl, brlCompact, formatDate, percent } from '@/lib/clinic/format';
 import { MAIN_PROFESSIONAL, type Professional } from '@/lib/clinic/permissions';
-import { makeId, monthKey, serviceCost, servicePrice, type Service, type Supply } from '@/lib/clinic/store';
+import { COST_CATEGORIES, costItemsFor, costTotal, makeId, monthCostsFrom, monthKey, serviceCost, servicePrice, type CostCategory, type CostItem, type Service, type Supply } from '@/lib/clinic/store';
+import { Select } from '@/components/ui/Select';
 import { Metric } from './common';
 import { MonthNav } from './MonthNav';
 import { PageHeader } from './Shell';
@@ -21,9 +22,6 @@ const shiftMonth = (month: string, delta: number) => { const [y, m] = month.spli
 
 export function Finance({ data, setData, month, onMonthChange, professionals = [] }: Props) {
   const [tab, setTab] = useState<Tab>('painel');
-  const costs = data.monthlyCosts[month] || { fixedCosts: 0, investments: 0 };
-  const setCosts = (patch: Partial<typeof costs>) => setData(current => ({ ...current, monthlyCosts: { ...current.monthlyCosts, [month]: { ...costs, ...patch } } }));
-
   const tabs: [Tab, string, typeof Wallet][] = [['painel', 'Painel', BarChart3], ['custos', 'Custos do mês', PiggyBank], ['atendimentos', 'Atendimentos e preços', Receipt], ['insumos', 'Insumos', Package]];
   return (
     <>
@@ -32,15 +30,7 @@ export function Finance({ data, setData, month, onMonthChange, professionals = [
         {tabs.map(([id, label, Icon]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}><Icon aria-hidden="true" />{label}</button>)}
       </div>
       {tab === 'painel' && <Dashboard data={data} month={month} professionals={professionals} />}
-      {tab === 'custos' && (
-        <section className="z-card white z-section">
-          <header className="z-section-head"><div><h2 className="t-h1">Custos de {formatDate(`${month}-01`, { month: 'long', year: 'numeric' })}</h2><p className="t-body t-muted">Entram no resultado do mês. Troque o mês no topo para lançar outro período.</p></div></header>
-          <div className="z-form-grid">
-            <div className="z-field"><label className="z-label" htmlFor="fixed">Custos fixos</label><MoneyInput id="fixed" value={costs.fixedCosts} onChange={value => setCosts({ fixedCosts: value })} /><span className="z-hint">Aluguel, equipe, sistemas, contador</span></div>
-            <div className="z-field"><label className="z-label" htmlFor="invest">Parcelas e investimentos</label><MoneyInput id="invest" value={costs.investments} onChange={value => setCosts({ investments: value })} /><span className="z-hint">Equipamentos, cursos, financiamentos</span></div>
-          </div>
-        </section>
-      )}
+      {tab === 'custos' && <Costs data={data} setData={setData} month={month} />}
       {tab === 'atendimentos' && <Services data={data} setData={setData} />}
       {tab === 'insumos' && <Supplies data={data} setData={setData} />}
     </>
@@ -53,15 +43,14 @@ function Dashboard({ data, month, professionals }: Pick<Props, 'data' | 'month'>
   const done = monthItems.filter(item => item.status === 'Realizada');
   const revenue = done.reduce((sum, item) => sum + item.price, 0);
   const expected = monthItems.filter(item => item.status === 'Agendada').reduce((sum, item) => sum + item.price, 0);
-  const costs = data.monthlyCosts[month] || { fixedCosts: 0, investments: 0 };
-  const totalCosts = costs.fixedCosts + costs.investments;
+  const totalCosts = costTotal(data, month);
   const result = revenue - totalCosts;
   const ticket = done.length ? revenue / done.length : 0;
 
   const months = Array.from({ length: 6 }, (_, index) => shiftMonth(month, index - 5));
   const history = months.map(key => {
     const income = data.appointments.filter(item => item.date.startsWith(key) && item.status === 'Realizada').reduce((sum, item) => sum + item.price, 0);
-    const spent = (data.monthlyCosts[key]?.fixedCosts || 0) + (data.monthlyCosts[key]?.investments || 0);
+    const spent = costTotal(data, key);
     return { label: formatDate(`${key}-01`, { month: 'short' }).replace('.', ''), tooltip: formatDate(`${key}-01`, { month: 'long', year: 'numeric' }), values: [income, spent] };
   });
   const byType = [...done.reduce((map, item) => map.set(item.type, { value: (map.get(item.type)?.value || 0) + item.price, count: (map.get(item.type)?.count || 0) + 1 }), new Map<string, { value: number; count: number }>())]
@@ -79,7 +68,7 @@ function Dashboard({ data, month, professionals }: Pick<Props, 'data' | 'month'>
       <div className="z-metrics">
         <Metric label="Receita realizada" value={brl(revenue)} note={`${done.length} consulta(s) realizada(s)`} icon={TrendingUp} tone="positive" />
         <Metric label="A receber" value={brl(expected)} note="Consultas ainda agendadas" icon={CalendarCheck} />
-        <Metric label="Custos do mês" value={brl(totalCosts)} note="Fixos + parcelas" icon={TrendingDown} />
+        <Metric label="Custos do mês" value={brl(totalCosts)} note="Fixos, parcelas, investimentos e extras" icon={TrendingDown} />
         <Metric label="Resultado" value={brl(result)} note={revenue ? `Margem de ${percent(result / revenue)}` : 'Receita − custos'} icon={Wallet} tone={result >= 0 ? 'positive' : 'negative'} />
         <Metric label="Ticket médio" value={brl(ticket)} note="Por consulta realizada" icon={Tag} />
       </div>
@@ -112,74 +101,135 @@ function Dashboard({ data, month, professionals }: Pick<Props, 'data' | 'month'>
   );
 }
 
-// Atendimentos: nome, duração, preço de venda e os insumos usados; custo e margem calculados.
-function Services({ data, setData }: Pick<Props, 'data' | 'setData'>) {
-  const patchService = (id: string, patch: Partial<Service>) => setData(current => ({ ...current, services: current.services.map(item => item.id === id ? { ...item, ...patch } : item) }));
-  const addService = () => setData(current => ({ ...current, services: [...current.services, { id: makeId(), name: 'Novo atendimento', knowledgeCost: current.knowledgeCost, items: [], duration: 30, price: 0 }] }));
+// Custos do mês em itens por categoria. Itens marcados "repete todo mês" aparecem sozinhos nos meses seguintes.
+function Costs({ data, setData, month }: Pick<Props, 'data' | 'setData' | 'month'>) {
+  const { items, inherited } = costItemsFor(data, month);
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  const save = (next: CostItem[]) => setData(current => ({ ...current, monthlyCosts: { ...current.monthlyCosts, [month]: monthCostsFrom(next) } }));
+  const patch = (id: string, change: Partial<CostItem>) => save(items.map(item => item.id === id ? { ...item, ...change } : item));
+  const add = (category: CostCategory) => save([...items, { id: makeId(), category, name: '', value: 0, recurring: category === 'fixo' || category === 'parcela' }]);
+  const previousMonth = (() => { const [y, m] = month.split('-').map(Number); return monthKey(new Date(y, m - 2, 1)); })();
+  const previousItems = costItemsFor(data, previousMonth).items;
   return (
     <section className="z-card white z-section">
       <header className="z-section-head">
-        <div><h2 className="t-h1">Atendimentos e preços</h2><p className="t-body t-muted">São os tipos que aparecem ao agendar: escolher um já preenche duração e valor.</p></div>
-        <div className="z-field z-margin">
-          <label className="z-label" htmlFor="margin"><Percent aria-hidden="true" />Margem alvo</label>
-          <div className="z-inputwrap"><input id="margin" className="num" inputMode="numeric" value={data.targetMargin} onChange={event => setData(current => ({ ...current, targetMargin: Math.max(0, Math.min(1000, Number(event.target.value.replace(/\D/g, '')) || 0)) }))} /><span className="z-prefix">%</span></div>
+        <div>
+          <h2 className="t-h1">Custos de {formatDate(`${month}-01`, { month: 'long', year: 'numeric' })}</h2>
+          <p className="t-body t-muted">Total de <strong className="num">{brl(total)}</strong>. {inherited ? 'Itens recorrentes trazidos do mês anterior: edite para confirmar este mês.' : 'Marque "Repete" no que se repete todo mês.'}</p>
+        </div>
+        {!items.length && previousItems.length > 0 && <button type="button" className="z-btn secondary" onClick={() => save(previousItems.map(item => ({ ...item, id: makeId() })))}><Copy />Copiar do mês anterior</button>}
+      </header>
+      {COST_CATEGORIES.map(category => {
+        const list = items.filter(item => item.category === category.id);
+        const subtotal = list.reduce((sum, item) => sum + item.value, 0);
+        return (
+          <details key={category.id} className="z-group" open={list.length > 0}>
+            <summary>
+              <ChevronDown className="z-chevron" aria-hidden="true" />
+              <strong>{category.label}</strong>
+              <span className="t-muted num">{list.length} item(ns) · {brl(subtotal)}</span>
+            </summary>
+            <p className="z-hint">{category.hint}</p>
+            {list.length > 0 && (
+              <div className="z-table-wrap">
+                <table className="z-table z-cost-table">
+                  <thead><tr><th>Descrição</th><th>Valor</th><th>Repete</th><th aria-label="Ações" /></tr></thead>
+                  <tbody>
+                    {list.map(item => (
+                      <tr key={item.id}>
+                        <td data-label="Descrição"><input className="z-input" aria-label="Descrição" value={item.name} placeholder="Ex.: Aluguel" onChange={event => patch(item.id, { name: event.target.value })} /></td>
+                        <td data-label="Valor"><MoneyInput ariaLabel="Valor" value={item.value} onChange={value => patch(item.id, { value })} /></td>
+                        <td data-label="Repete"><label className="z-switch" title="Repete todo mês"><input type="checkbox" checked={Boolean(item.recurring)} onChange={event => patch(item.id, { recurring: event.target.checked })} /><span className="track" aria-hidden="true" /><Repeat aria-hidden="true" className="z-cost-repeat" /></label></td>
+                        <td><button type="button" className="z-close" onClick={() => save(items.filter(entry => entry.id !== item.id))} aria-label="Remover custo" title="Remover"><Trash2 /></button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <button type="button" className="z-btn ghost sm" onClick={() => add(category.id)}><Plus />Adicionar em {category.label.toLowerCase()}</button>
+          </details>
+        );
+      })}
+    </section>
+  );
+}
+
+// Atendimentos em tabela: cada linha abre o detalhe (duração, preço, insumos usados e conhecimento).
+function Services({ data, setData }: Pick<Props, 'data' | 'setData'>) {
+  const patchService = (id: string, patch: Partial<Service>) => setData(current => ({ ...current, services: current.services.map(item => item.id === id ? { ...item, ...patch } : item) }));
+  const addService = () => setData(current => ({ ...current, services: [...current.services, { id: makeId(), name: 'Novo atendimento', knowledgeCost: current.knowledgeCost, items: [], duration: 30, price: 0 }] }));
+  const supplyOptions = data.supplies.map(entry => ({ value: entry.id, label: entry.name, hint: `${entry.category} · ${brl(entry.unitCost)}/${entry.unit}` }));
+  return (
+    <section className="z-card white z-section">
+      <header className="z-section-head">
+        <div><h2 className="t-h1">Atendimentos e preços</h2><p className="t-body t-muted">São os tipos que aparecem ao agendar: escolher um já preenche duração e valor. Clique numa linha para ver os detalhes.</p></div>
+        <div className="z-row-actions">
+          <div className="z-field z-margin">
+            <label className="z-label" htmlFor="margin"><Percent aria-hidden="true" />Margem alvo</label>
+            <div className="z-inputwrap"><input id="margin" className="num" inputMode="numeric" value={data.targetMargin} onChange={event => setData(current => ({ ...current, targetMargin: Math.max(0, Math.min(1000, Number(event.target.value.replace(/\D/g, '')) || 0)) }))} /><span className="z-prefix">%</span></div>
+          </div>
+          <button type="button" className="z-btn brand" onClick={addService}><Plus />Novo atendimento</button>
         </div>
       </header>
-      <div className="z-services">
+      <div className="z-service-table" role="table" aria-label="Atendimentos">
+        <div className="z-service-row head" role="row"><span role="columnheader">Atendimento</span><span role="columnheader">Duração</span><span role="columnheader">Custo</span><span role="columnheader">Preço</span><span role="columnheader">Margem</span></div>
         {data.services.map(service => {
           const cost = serviceCost(service, data.supplies);
           const suggested = cost * (1 + data.targetMargin / 100);
           const price = servicePrice(service, data.supplies, data.targetMargin);
           const margin = price ? (price - cost) / price : 0;
           return (
-            <article key={service.id} className="z-card z-service">
-              <header className="z-service-head">
-                <input className="z-input z-title-input" aria-label="Nome do atendimento" value={service.name} onChange={event => patchService(service.id, { name: event.target.value })} />
-                <button type="button" className="z-close" onClick={() => setData(current => ({ ...current, services: current.services.filter(item => item.id !== service.id) }))} aria-label={`Remover ${service.name}`} title="Remover atendimento"><Trash2 /></button>
-              </header>
-              <div className="z-form-grid">
-                <div className="z-field">
-                  <label className="z-label" htmlFor={`dur-${service.id}`}><Clock aria-hidden="true" />Duração</label>
-                  <select id={`dur-${service.id}`} className="z-select" value={service.duration || 30} onChange={event => patchService(service.id, { duration: Number(event.target.value) })}>
-                    {DURATIONS.map(minutes => <option key={minutes} value={minutes}>{minutes} min</option>)}
-                  </select>
+            <details key={service.id} className="z-service-line">
+              <summary className="z-service-row" role="row">
+                <span role="cell" className="z-service-name"><ChevronDown className="z-chevron" aria-hidden="true" />{service.name || 'Sem nome'}</span>
+                <span role="cell" className="num">{service.duration || 30} min</span>
+                <span role="cell" className="num">{brl(cost)}</span>
+                <span role="cell" className="num"><strong>{brl(price)}</strong>{!service.price && <small className="t-muted"> sugerido</small>}</span>
+                <span role="cell" className={`num ${margin >= 0 ? 'tone-positive' : 'tone-negative'}`}>{percent(margin)}</span>
+              </summary>
+              <div className="z-service-detail">
+                <div className="z-form-grid three">
+                  <div className="z-field"><label className="z-label" htmlFor={`name-${service.id}`}>Nome</label><input id={`name-${service.id}`} className="z-input" value={service.name} onChange={event => patchService(service.id, { name: event.target.value })} /></div>
+                  <div className="z-field">
+                    <label className="z-label" htmlFor={`dur-${service.id}`}><Clock aria-hidden="true" />Duração</label>
+                    <Select id={`dur-${service.id}`} value={String(service.duration || 30)} options={DURATIONS.map(minutes => ({ value: String(minutes), label: `${minutes} min` }))} onChange={value => patchService(service.id, { duration: Number(value) })} ariaLabel="Duração" />
+                  </div>
+                  <div className="z-field">
+                    <label className="z-label" htmlFor={`price-${service.id}`}><Tag aria-hidden="true" />Preço de venda</label>
+                    <MoneyInput id={`price-${service.id}`} value={service.price || 0} onChange={value => patchService(service.id, { price: value })} />
+                    <span className="z-hint">{service.price ? <button type="button" className="z-link" onClick={() => patchService(service.id, { price: 0 })}>Usar o sugerido ({brl(suggested)})</button> : `Em branco usa o sugerido: ${brl(suggested)}`}</span>
+                  </div>
                 </div>
-                <div className="z-field">
-                  <label className="z-label" htmlFor={`price-${service.id}`}><Tag aria-hidden="true" />Preço de venda</label>
-                  <MoneyInput id={`price-${service.id}`} value={service.price || 0} onChange={value => patchService(service.id, { price: value })} />
-                  <span className="z-hint">{service.price ? <button type="button" className="z-link" onClick={() => patchService(service.id, { price: 0 })}>Usar o sugerido ({brl(suggested)})</button> : `Em branco usa o sugerido: ${brl(suggested)}`}</span>
+                <div className="z-table-wrap">
+                  <table className="z-table z-items-table">
+                    <thead><tr><th>Insumo ou produto</th><th className="num-col">Qtd.</th><th>Unidade</th><th className="num-col">Subtotal</th><th aria-label="Ações" /></tr></thead>
+                    <tbody>
+                      {service.items.map((item, index) => {
+                        const supply = data.supplies.find(entry => entry.id === item.supplyId);
+                        return (
+                          <tr key={`${item.supplyId}-${index}`}>
+                            <td data-label="Insumo"><Select size="sm" value={item.supplyId} options={supplyOptions} ariaLabel="Insumo" onChange={value => patchService(service.id, { items: service.items.map((entry, i) => i === index ? { ...entry, supplyId: value } : entry) })} /></td>
+                            <td data-label="Qtd." className="num-col"><DecimalInput className="z-qty" ariaLabel="Quantidade" value={item.qty} onChange={qty => patchService(service.id, { items: service.items.map((entry, i) => i === index ? { ...entry, qty } : entry) })} /></td>
+                            <td data-label="Unidade" className="t-muted">{supply?.unit || 'un'}</td>
+                            <td data-label="Subtotal" className="num-col num">{brl((supply?.unitCost || 0) * item.qty)}</td>
+                            <td><button type="button" className="z-close" onClick={() => patchService(service.id, { items: service.items.filter((_, i) => i !== index) })} aria-label="Remover insumo"><Trash2 /></button></td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="z-service-foot">
+                  {data.supplies.length > 0 && <button type="button" className="z-btn ghost sm" onClick={() => patchService(service.id, { items: [...service.items, { supplyId: data.supplies[0].id, qty: data.supplies[0].defaultQty }] })}><Plus />Adicionar insumo</button>}
+                  <div className="z-field z-knowledge"><label className="z-label" htmlFor={`k-${service.id}`}>Conhecimento profissional</label><MoneyInput id={`k-${service.id}`} value={service.knowledgeCost} onChange={value => patchService(service.id, { knowledgeCost: value })} /></div>
+                  <button type="button" className="z-btn danger-ghost sm" onClick={() => setData(current => ({ ...current, services: current.services.filter(item => item.id !== service.id) }))}><Trash2 />Remover atendimento</button>
                 </div>
               </div>
-              <div className="z-service-items">
-                <span className="z-label">Insumos e produtos usados</span>
-                {service.items.map((item, index) => {
-                  const supply = data.supplies.find(entry => entry.id === item.supplyId);
-                  return (
-                    <div key={`${item.supplyId}-${index}`} className="z-service-item">
-                      <select className="z-select" aria-label="Insumo" value={item.supplyId} onChange={event => patchService(service.id, { items: service.items.map((entry, i) => i === index ? { ...entry, supplyId: event.target.value } : entry) })}>
-                        {data.supplies.map(entry => <option key={entry.id} value={entry.id}>{entry.name}</option>)}
-                      </select>
-                      <DecimalInput className="z-qty" ariaLabel="Quantidade" suffix={supply?.unit || 'un'} value={item.qty} onChange={qty => patchService(service.id, { items: service.items.map((entry, i) => i === index ? { ...entry, qty } : entry) })} />
-                      <span className="z-service-sub num">{brl((supply?.unitCost || 0) * item.qty)}</span>
-                      <button type="button" className="z-close" onClick={() => patchService(service.id, { items: service.items.filter((_, i) => i !== index) })} aria-label="Remover insumo"><Trash2 /></button>
-                    </div>
-                  );
-                })}
-                {data.supplies.length > 0 && <button type="button" className="z-chip" onClick={() => patchService(service.id, { items: [...service.items, { supplyId: data.supplies[0].id, qty: data.supplies[0].defaultQty }] })}><Plus />Adicionar insumo</button>}
-              </div>
-              <div className="z-service-knowledge">
-                <label className="z-label" htmlFor={`k-${service.id}`}>Conhecimento profissional</label>
-                <MoneyInput id={`k-${service.id}`} value={service.knowledgeCost} onChange={value => patchService(service.id, { knowledgeCost: value })} />
-              </div>
-              <footer className="z-service-total three">
-                <div><span className="t-body t-muted">Custo</span><strong className="num">{brl(cost)}</strong></div>
-                <div><span className="t-body t-muted">Preço</span><strong className="num">{brl(price)}</strong></div>
-                <div><span className="t-body t-muted">Margem</span><strong className={`num ${margin >= 0 ? 'tone-positive' : 'tone-negative'}`}>{percent(margin)}</strong></div>
-              </footer>
-            </article>
+            </details>
           );
         })}
-        <button type="button" className="z-card flat z-add-card" onClick={addService}><Receipt aria-hidden="true" /><span>Adicionar atendimento</span></button>
+        {!data.services.length && <div className="z-empty"><Receipt aria-hidden="true" /><span>Nenhum atendimento. Crie o primeiro, por exemplo “Consulta”.</span></div>}
       </div>
     </section>
   );

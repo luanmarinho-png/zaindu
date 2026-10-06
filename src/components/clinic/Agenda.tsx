@@ -8,6 +8,7 @@ import { dayKey, monthKey, type Appointment, type Store } from '@/lib/clinic/sto
 import { StatusBadge } from './common';
 import { MonthNav } from './MonthNav';
 import { PageHeader } from './Shell';
+import { Select } from '@/components/ui/Select';
 
 const WEEKDAYS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
 
@@ -62,10 +63,7 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
         subtitle="Toque num dia para ver os horários. Use + para agendar."
         actions={<>
           {professionals.length > 1 && onProfessionalFilter && (
-            <select className="z-select z-pro-filter" aria-label="Agenda de" value={professionalFilter} onChange={event => onProfessionalFilter(event.target.value)}>
-              <option value="">Todos os profissionais</option>
-              {professionals.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
+            <Select className="z-pro-filter" ariaLabel="Agenda de" value={professionalFilter} onChange={onProfessionalFilter} options={[{ value: '', label: 'Todos os profissionais' }, ...professionals.map(item => ({ value: item.id, label: item.name, hint: item.specialty || undefined }))]} />
           )}
           <MonthNav month={month} onChange={changeMonth} />
           <button type="button" className="z-btn brand" onClick={() => onNew(selectedDate)}><Plus />Nova consulta</button>

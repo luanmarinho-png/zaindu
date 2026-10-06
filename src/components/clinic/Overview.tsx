@@ -4,7 +4,7 @@ import { ArrowRight, BookOpen, Cake, CalendarDays, CalendarPlus, Lightbulb, Plus
 import { ColumnChart } from '@/components/ui/Charts';
 import { brl, formatDate, percent } from '@/lib/clinic/format';
 import { MAIN_PROFESSIONAL, type Access, type Professional } from '@/lib/clinic/permissions';
-import { dayKey, monthKey, verseForToday, type Appointment, type Store } from '@/lib/clinic/store';
+import { costTotal, dayKey, monthKey, verseForToday, type Appointment, type Store } from '@/lib/clinic/store';
 import { Metric, StatusBadge } from './common';
 import { MonthNav } from './MonthNav';
 import { PageHeader } from './Shell';
@@ -90,8 +90,7 @@ export function Overview({ data, access, professionals = [], month, onMonthChang
   const monthItems = items.filter(item => item.date.startsWith(month));
   const scheduled = monthItems.filter(item => item.status === 'Agendada').length;
   const revenue = monthItems.filter(item => item.status === 'Realizada').reduce((sum, item) => sum + item.price, 0);
-  const costs = data.monthlyCosts[month] || { fixedCosts: 0, investments: 0 };
-  const result = revenue - costs.fixedCosts - costs.investments;
+  const result = revenue - costTotal(data, month);
   const upcoming = items
     .filter(item => item.status === 'Agendada' && item.date >= today)
     .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))

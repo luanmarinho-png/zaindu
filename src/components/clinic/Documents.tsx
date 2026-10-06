@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { DOCUMENT_KINDS, documentHtml } from '@/lib/clinic/documentHtml';
 import { MAIN_PROFESSIONAL, type Brand, type Professional } from '@/lib/clinic/permissions';
 import { makeId, type ClinicalDocument, type ClinicSettings, type DocumentKind, type Patient } from '@/lib/clinic/store';
+import { Select } from '@/components/ui/Select';
 
 // Abre o documento com o timbre da clínica numa janela própria e chama a impressão (o navegador oferece "Salvar como PDF").
 export function printDocument(document: ClinicalDocument, patient: Patient, settings: ClinicSettings, brand: Brand | null, professional: Professional | undefined) {
@@ -71,9 +72,7 @@ export function DocumentModal({ patient, professionals, defaultProfessional, doc
         <Field label="Data" icon={CalendarDays} htmlFor="d-date"><input id="d-date" className="z-input" type="date" value={date} onChange={event => setDate(event.target.value)} /></Field>
         {professionals.length > 1 && (
           <Field label="Assina" icon={UserRoundCog} htmlFor="d-pro" full>
-            <select id="d-pro" className="z-select" value={professionalId} onChange={event => setProfessionalId(event.target.value)}>
-              {professionals.map(item => <option key={item.id} value={item.id}>{item.name}{item.registry ? ` · ${item.registry}` : ''}</option>)}
-            </select>
+            <Select id="d-pro" value={professionalId} ariaLabel="Profissional que assina" onChange={setProfessionalId} options={professionals.map(item => ({ value: item.id, label: item.name, hint: item.registry || undefined }))} />
           </Field>
         )}
         <Field label="Texto" icon={FileSignature} htmlFor="d-body" full hint="Assinatura manual no papel, ou digital ao salvar o PDF num assinador (ex.: gov.br ou certificado ICP-Brasil).">

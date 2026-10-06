@@ -8,12 +8,15 @@ import { Toast } from '@/components/ui/Toast';
 import { applyBrand, isLightColor } from '@/lib/clinic/brand';
 import { formatDate } from '@/lib/clinic/format';
 import { canManageTeam, type Access, type Brand } from '@/lib/clinic/permissions';
-import { makeId, type ClinicSettings } from '@/lib/clinic/store';
-import { FIELD_TYPES, recordFromTemplate, TEMPLATES, type FieldType, type RecordConfig, type RecordSection, type TemplateField } from '@/lib/clinic/templates';
+import { makeId, servicePrice, type ClinicSettings } from '@/lib/clinic/store';
+import { MoneyInput } from '@/components/ui/MoneyInput';
+import { brl } from '@/lib/clinic/format';
+import { ANAMNESIS_GROUPS, FIELD_TYPES, fieldGroup, groupFields, recordFromTemplate, TEMPLATES, type FieldType, type RecordConfig, type RecordSection, type TemplateField } from '@/lib/clinic/templates';
 import { TemplateInput } from './Record';
 import { PageHeader } from './Shell';
 import { Team } from './Team';
 import type { ClinicProps } from './types';
+import { Select } from '@/components/ui/Select';
 
 type Tab = 'clinica' | 'prontuario' | 'equipe' | 'historico';
 type Props = ClinicProps & { access?: Access; brand?: Brand | null; onBrandChange?: (brand: Brand) => void };
@@ -53,6 +56,7 @@ export function Settings({ data, setData, access, brand = null, onBrandChange }:
             <span><strong>Palavra do dia</strong><small className="t-muted">Versículo e reflexão diária no card da visão geral</small></span>
           </label>
         </section>
+        {access?.modules.includes('financeiro') !== false && <ServiceTypes data={data} setData={setData} />}
         <EditableList title="Checklist clínico" hint="Achados marcáveis em cada evolução do prontuário." values={data.settings.trichoscopyFindings} onChange={values => set({ trichoscopyFindings: values })} />
       </>}
       {tab === 'prontuario' && <RecordEditor record={data.settings.record} findings={data.settings.trichoscopyFindings} onChange={record => set({ record })} />}
@@ -178,6 +182,7 @@ function RecordEditor({ record, findings, onChange }: { record: RecordConfig; fi
               : <button type="button" className="z-btn ghost" onClick={() => setConfirmReset(true)}><RotateCcw />Restaurar modelo</button>)}
           </div>
         </header>
+        <datalist id="anamnesis-groups">{ANAMNESIS_GROUPS.map(item => <option key={item} value={item} />)}</datalist>
         <ol className="z-steps">
           {groups.map((group, index) => (
             <li key={group.id} className="z-step custom">
@@ -195,10 +200,11 @@ function RecordEditor({ record, findings, onChange }: { record: RecordConfig; fi
               <ul className="z-step-fields">
                 {group.fields.map((field, fieldIndex) => (
                   <li key={field.key}>
-                    <input className="z-input" value={field.label} onChange={event => patchField(index, field.key, { label: event.target.value })} placeholder="Pergunta" aria-label="Pergunta" />
-                    <select className="z-select" value={field.type} onChange={event => patchField(index, field.key, { type: event.target.value as FieldType })} aria-label="Tipo de resposta">
-                      {(Object.keys(FIELD_TYPES) as FieldType[]).map(type => <option key={type} value={type}>{FIELD_TYPES[type]}</option>)}
-                    </select>
+                    <div className="z-step-label">
+                      <input className="z-input" value={field.label} onChange={event => patchField(index, field.key, { label: event.target.value })} placeholder="Pergunta" aria-label="Pergunta" />
+                      {index === 0 && <input className="z-input z-step-group" list="anamnesis-groups" value={field.group ?? fieldGroup(field)} onChange={event => patchField(index, field.key, { group: event.target.value })} aria-label="Categoria da pergunta" title="Categoria" />}
+                    </div>
+                    <Select value={field.type} ariaLabel="Tipo de resposta" onChange={value => patchField(index, field.key, { type: value as FieldType })} options={(Object.keys(FIELD_TYPES) as FieldType[]).map(type => ({ value: type, label: FIELD_TYPES[type] }))} />
                     {(field.type === 'select' || field.type === 'checklist')
                       ? <input className="z-input z-step-options" value={(field.options || []).join(', ')} onChange={event => patchField(index, field.key, { options: event.target.value.split(',').map(item => item.trimStart()) })} onBlur={event => patchField(index, field.key, { options: event.target.value.split(',').map(item => item.trim()).filter(Boolean) })} placeholder="Opções separadas por vírgula" aria-label="Opções" />
                       : <input className="z-input z-step-options" value={field.placeholder || ''} onChange={event => patchField(index, field.key, { placeholder: event.target.value })} placeholder="Texto de ajuda (opcional)" aria-label="Texto de ajuda" />}
@@ -217,19 +223,36 @@ function RecordEditor({ record, findings, onChange }: { record: RecordConfig; fi
         <button type="button" className="z-card flat z-add-card" onClick={() => commit([...groups, { id: `etapa-${makeId().slice(0, 8)}`, title: 'Nova etapa', custom: true, fields: [newField()] }])}><Plus aria-hidden="true" /><span>Adicionar etapa à evolução</span></button>
       </section>
       {preview && (
-        <Modal size="lg" title="Como fica o prontuário" description="Pré-visualização com as perguntas atuais. Nada é salvo aqui." onClose={() => setPreview(false)}>
-          {groups.map(group => (
-            <fieldset key={group.id} className="z-fieldset">
-              <legend>{group.title}</legend>
-              <div className="z-form-grid">{group.fields.map(field => <TemplateInput key={field.key} field={field} prefix={`p-${group.id}`} value="" />)}</div>
-            </fieldset>
-          ))}
-          {findings.length > 0 && (
-            <fieldset className="z-fieldset">
-              <legend>Checklist de achados</legend>
-              <div className="z-checkgrid">{findings.map(item => <label key={item} className="z-check"><input type="checkbox" /><span>{item}</span></label>)}</div>
-            </fieldset>
-          )}
+        <Modal size="lg" variant="drawer" title="Como fica o prontuário" description="Pré-visualização com as perguntas atuais. Nada é salvo aqui." onClose={() => setPreview(false)}>
+          <nav className="z-drawer-nav" aria-label="Seções do prontuário">
+            <a href="#prev-anamnese">Anamnese</a>
+            {record.sections.map(section => <a key={section.id} href={`#prev-${section.id}`}>{section.title}</a>)}
+            {findings.length > 0 && <a href="#prev-checklist">Checklist</a>}
+          </nav>
+          <section id="prev-anamnese" className="z-preview-block">
+            <h3 className="t-h1">Anamnese</h3>
+            {groupFields(record.anamnesis).map(group => (
+              <fieldset key={group.title} className="z-fieldset">
+                <legend>{group.title}</legend>
+                <div className="z-form-grid">{group.fields.map(field => <TemplateInput key={field.key} field={field} prefix="p-anamnese" value="" />)}</div>
+              </fieldset>
+            ))}
+          </section>
+          <section className="z-preview-block">
+            <h3 className="t-h1">Evolução</h3>
+            {record.sections.map(group => (
+              <fieldset key={group.id} id={`prev-${group.id}`} className="z-fieldset">
+                <legend>{group.title}</legend>
+                <div className="z-form-grid">{group.fields.map(field => <TemplateInput key={field.key} field={field} prefix={`p-${group.id}`} value="" />)}</div>
+              </fieldset>
+            ))}
+            {findings.length > 0 && (
+              <fieldset id="prev-checklist" className="z-fieldset">
+                <legend>Checklist de achados</legend>
+                <div className="z-checkgrid">{findings.map(item => <label key={item} className="z-check"><input type="checkbox" /><span>{item}</span></label>)}</div>
+              </fieldset>
+            )}
+          </section>
         </Modal>
       )}
     </>
@@ -270,6 +293,39 @@ function AuditLog({ clinicId }: { clinicId: string }) {
           ))}
         </ol>
       ) : <div className="z-empty"><span>Nenhuma alteração registrada ainda.</span></div>}
+    </section>
+  );
+}
+
+const DURATIONS = [15, 30, 45, 60, 90, 120];
+
+// Tipos de atendimento (os mesmos do Financeiro): nome, duração e preço. Insumos e custos ficam no Financeiro.
+function ServiceTypes({ data, setData }: ClinicProps) {
+  const patch = (id: string, change: Partial<ClinicProps['data']['services'][number]>) => setData(current => ({ ...current, services: current.services.map(item => item.id === id ? { ...item, ...change } : item) }));
+  const add = () => setData(current => ({ ...current, services: [...current.services, { id: makeId(), name: '', knowledgeCost: current.knowledgeCost, items: [], duration: 30, price: 0 }] }));
+  return (
+    <section className="z-card white z-section">
+      <header className="z-section-head">
+        <div><h2 className="t-h1"><ListChecks aria-hidden="true" className="z-inline-icon" />Tipos de atendimento</h2><p className="t-body t-muted">Aparecem ao agendar e já preenchem duração e valor. Insumos e custos de cada um ficam em Financeiro → Atendimentos.</p></div>
+        <button type="button" className="z-btn secondary" onClick={add}><Plus />Novo tipo</button>
+      </header>
+      {data.services.length ? (
+        <div className="z-table-wrap">
+          <table className="z-table z-types-table">
+            <thead><tr><th>Nome</th><th>Duração</th><th>Preço</th><th aria-label="Ações" /></tr></thead>
+            <tbody>
+              {data.services.map(service => (
+                <tr key={service.id}>
+                  <td data-label="Nome"><input className="z-input" value={service.name} placeholder="Ex.: Consulta inicial" onChange={event => patch(service.id, { name: event.target.value })} aria-label="Nome do atendimento" /></td>
+                  <td data-label="Duração"><Select size="sm" value={String(service.duration || 30)} ariaLabel="Duração" onChange={value => patch(service.id, { duration: Number(value) })} options={DURATIONS.map(minutes => ({ value: String(minutes), label: `${minutes} min` }))} /></td>
+                  <td data-label="Preço"><MoneyInput ariaLabel="Preço" value={service.price || 0} onChange={value => patch(service.id, { price: value })} placeholder={brl(servicePrice({ ...service, price: 0 }, data.supplies, data.targetMargin))} /></td>
+                  <td><button type="button" className="z-close" onClick={() => setData(current => ({ ...current, services: current.services.filter(item => item.id !== service.id) }))} aria-label={`Remover ${service.name}`} title="Remover"><Trash2 /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <div className="z-empty"><span>Nenhum tipo cadastrado. Crie, por exemplo, “Consulta” e “Retorno”.</span></div>}
     </section>
   );
 }

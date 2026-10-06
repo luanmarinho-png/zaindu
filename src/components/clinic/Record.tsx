@@ -8,10 +8,11 @@ import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { ageFrom, formatDate } from '@/lib/clinic/format';
 import { emptyProfile, makeId, type Appointment, type ClinicalDocument, type ClinicalNote, type MediaAttachment, type Patient, type PatientProfile, type Store } from '@/lib/clinic/store';
-import { allNoteFields, type TemplateField, type TemplateId } from '@/lib/clinic/templates';
+import { allNoteFields, groupFields, type TemplateField, type TemplateId } from '@/lib/clinic/templates';
 import { PatientPicker, Remember, StatusBadge } from './common';
 import { PageHeader } from './Shell';
 import type { ClinicProps } from './types';
+import { Select } from '@/components/ui/Select';
 
 // A categoria "trichoscopy" guarda o exame com aumento de cada especialidade.
 const SCOPE_LABEL: Record<TemplateId, string> = { tricologia: 'Tricoscopia', dermatologia: 'Dermatoscopia', geral: 'Exame' };
@@ -106,11 +107,12 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
             <div><h2 className="t-h1">Anamnese</h2><p className="t-body t-muted">Histórico de saúde, editável ao longo do acompanhamento.</p></div>
             <button type="button" className="z-btn secondary" onClick={() => setProfileModal(true)}>Editar anamnese</button>
           </header>
-          {anamnesis.length ? (
-            <dl className="z-deflist">
-              {anamnesis.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{display(field, profile[field.key])}</dd></div>)}
-            </dl>
-          ) : <div className="z-empty"><span>Anamnese ainda não preenchida.</span></div>}
+          {anamnesis.length ? groupFields(anamnesis).map(group => (
+            <div key={group.title} className="z-note-group">
+              <h4 className="t-body-strong t-muted">{group.title}</h4>
+              <dl className="z-deflist">{group.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{display(field, profile[field.key])}</dd></div>)}</dl>
+            </div>
+          )) : <div className="z-empty"><span>Anamnese ainda não preenchida.</span></div>}
         </section>
 
         <section className="z-card white z-section">
@@ -276,7 +278,7 @@ export function TemplateInput({ field, prefix, value }: { field: TemplateField; 
   return (
     <Field label={field.label || 'Campo sem nome'} htmlFor={id} full={field.wide || (field.type === 'textarea' && prefix === 'a')}>
       {field.type === 'date' ? <input id={id} name={field.key} className="z-input" type="date" defaultValue={text} />
-        : field.type === 'select' ? <select id={id} name={field.key} className="z-select" defaultValue={text}><option value="">Não informado</option>{(field.options || []).map(option => <option key={option}>{option}</option>)}</select>
+        : field.type === 'select' ? <Select id={id} name={field.key} defaultValue={text} ariaLabel={field.label} options={[{ value: '', label: 'Não informado' }, ...(field.options || []).map(option => ({ value: option, label: option }))]} />
         : field.type === 'text' ? <input id={id} name={field.key} className="z-input" placeholder={field.placeholder} defaultValue={text} />
         : <textarea id={id} name={field.key} className="z-textarea" rows={field.wide ? 4 : 2} placeholder={field.placeholder} defaultValue={text} />}
     </Field>
@@ -318,6 +320,7 @@ function NoteModal({ data, patient, note, appointmentId, onClose, onSave, onDele
   return (
     <Modal
       size="lg"
+      variant="drawer"
       title={note ? 'Editar evolução' : 'Nova evolução'}
       description={patient.name}
       onClose={onClose}
@@ -334,10 +337,7 @@ function NoteModal({ data, patient, note, appointmentId, onClose, onSave, onDele
       <div className="z-form-grid" style={{ marginBottom: 24 }}>
         <Field label="Data" htmlFor="n-date"><input id="n-date" name="date" className="z-input" type="date" required defaultValue={note?.date || new Date().toISOString().slice(0, 10)} /></Field>
         <Field label="Consulta" htmlFor="n-appt">
-          <select id="n-appt" name="appointmentId" className="z-select" defaultValue={note?.appointmentId || appointmentId}>
-            <option value="">Anotação geral</option>
-            {appointmentsOfPatient.map(item => <option key={item.id} value={item.id}>{formatDate(item.date)} · {item.type}</option>)}
-          </select>
+          <Select id="n-appt" name="appointmentId" defaultValue={note?.appointmentId || appointmentId} ariaLabel="Consulta" options={[{ value: '', label: 'Anotação geral' }, ...appointmentsOfPatient.map(item => ({ value: item.id, label: `${formatDate(item.date)} · ${item.type}` }))]} />
         </Field>
       </div>
       {data.settings.record.sections.map(section => (
@@ -372,6 +372,7 @@ function ProfileModal({ fields, profile, onClose, onSave }: { fields: TemplateFi
   return (
     <Modal
       size="lg"
+      variant="drawer"
       title="Anamnese"
       description="Registre o que for pertinente, com contexto e consentimento."
       onClose={onClose}
@@ -379,7 +380,12 @@ function ProfileModal({ fields, profile, onClose, onSave }: { fields: TemplateFi
       footer={<><span className="spacer" /><button type="button" className="z-btn secondary" onClick={onClose}>Cancelar</button><button type="submit" className="z-btn brand">Salvar anamnese</button></>}
     >
       <div className="z-form-grid">
-        {fields.map(field => <TemplateInput key={field.key} field={field} prefix="a" value={profile[field.key]} />)}
+        {groupFields(fields).map(group => (
+          <fieldset key={group.title} className="z-fieldset full">
+            <legend>{group.title}</legend>
+            <div className="z-form-grid">{group.fields.map(field => <TemplateInput key={field.key} field={field} prefix="a" value={profile[field.key]} />)}</div>
+          </fieldset>
+        ))}
       </div>
     </Modal>
   );
@@ -420,10 +426,10 @@ function MediaModal({ kinds: MEDIA_KIND, appointments, patientId, onClose, onSav
     >
       <div className="z-form-grid">
         <Field label="Imagem" required full htmlFor="m-file"><input id="m-file" type="file" name="image" accept="image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif" required className="z-file" /></Field>
-        <Field label="Categoria" htmlFor="m-kind"><select id="m-kind" name="kind" className="z-select" defaultValue="trichoscopy">{(Object.keys(MEDIA_KIND) as MediaAttachment['kind'][]).map(kind => <option key={kind} value={kind}>{MEDIA_KIND[kind]}</option>)}</select></Field>
+        <Field label="Categoria" htmlFor="m-kind"><Select id="m-kind" name="kind" defaultValue="trichoscopy" ariaLabel="Categoria" options={(Object.keys(MEDIA_KIND) as MediaAttachment['kind'][]).map(kind => ({ value: kind, label: MEDIA_KIND[kind] }))} /></Field>
         <Field label="Data da imagem" htmlFor="m-date"><input id="m-date" name="capturedAt" type="date" className="z-input" defaultValue={new Date().toISOString().slice(0, 10)} /></Field>
         <Field label="Legenda" full htmlFor="m-caption"><input id="m-caption" name="caption" className="z-input" placeholder="Ex.: frontal, vértex, lado direito" /></Field>
-        <Field label="Consulta" full htmlFor="m-appt"><select id="m-appt" name="appointmentId" className="z-select" defaultValue=""><option value="">Sem vínculo</option>{appointments.map(item => <option key={item.id} value={item.id}>{formatDate(item.date)} · {item.type}</option>)}</select></Field>
+        <Field label="Consulta" full htmlFor="m-appt"><Select id="m-appt" name="appointmentId" defaultValue="" ariaLabel="Consulta" options={[{ value: '', label: 'Sem vínculo' }, ...appointments.map(item => ({ value: item.id, label: `${formatDate(item.date)} · ${item.type}` }))]} /></Field>
       </div>
     </Modal>
   );
@@ -441,9 +447,7 @@ function CompareModal({ media, kinds, onClose }: { media: MediaAttachment[]; kin
     const item = media.find(entry => entry.id === id);
     return (
       <figure className="z-compare-side">
-        <select className="z-select" aria-label={name} value={id} onChange={event => onChange(event.target.value)}>
-          {chronological.map(entry => <option key={entry.id} value={entry.id}>{label(entry)}</option>)}
-        </select>
+        <Select ariaLabel={name} value={id} onChange={onChange} options={chronological.map(entry => ({ value: entry.id, label: label(entry) }))} />
         {item && <img src={`/api/media/${encodeURIComponent(item.storageKey)}`} alt={label(item)} />}
         {item && <figcaption><span className="z-badge sm">{kinds[item.kind]}</span>{formatDate(item.capturedAt, { day: '2-digit', month: 'long', year: 'numeric' })}</figcaption>}
       </figure>

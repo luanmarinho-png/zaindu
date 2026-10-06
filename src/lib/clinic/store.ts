@@ -23,9 +23,19 @@ export type Supply = { id:string; name:string; category:string; unit:string; uni
 export type ServiceItem = { supplyId: string; qty: number };
 // price 0 = usa o preço sugerido (custo + margem). duration em minutos, usada ao agendar.
 export type Service = { id: string; name: string; knowledgeCost: number; items: ServiceItem[]; duration?: number; price?: number };
+// Custos do mês detalhados. fixedCosts/investments ficam como totais para registros antigos e relatórios.
+export type CostCategory = 'fixo' | 'parcela' | 'investimento' | 'extra';
+export type CostItem = { id: string; category: CostCategory; name: string; value: number; recurring?: boolean };
+export type MonthCosts = { fixedCosts: number; investments: number; items?: CostItem[] };
+export const COST_CATEGORIES: { id: CostCategory; label: string; hint: string }[] = [
+  { id: 'fixo', label: 'Custos fixos', hint: 'Aluguel, salários, sistemas, contador, condomínio' },
+  { id: 'parcela', label: 'Parcelas e financiamentos', hint: 'Equipamentos parcelados, empréstimos' },
+  { id: 'investimento', label: 'Investimentos', hint: 'Cursos, marketing, reformas, equipamentos à vista' },
+  { id: 'extra', label: 'Custos esporádicos e extras', hint: 'Manutenção, compras pontuais, imprevistos' },
+];
 export type DocumentKind = 'receita' | 'atestado' | 'comparecimento' | 'exames' | 'livre';
 export type ClinicalDocument = { id: string; patientId: string; kind: DocumentKind; title: string; body: string; date: string; professionalId: string; createdAt: string };
-export type Store = { services: Service[]; supplies: Supply[]; knowledgeCost:number; targetMargin:number; patients: Patient[]; appointments: Appointment[]; notes: ClinicalNote[]; profiles: Record<string, PatientProfile>; media: MediaAttachment[]; documents: ClinicalDocument[]; settings: ClinicSettings; monthlyCosts: Record<string, { fixedCosts: number; investments: number }> };
+export type Store = { services: Service[]; supplies: Supply[]; knowledgeCost:number; targetMargin:number; patients: Patient[]; appointments: Appointment[]; notes: ClinicalNote[]; profiles: Record<string, PatientProfile>; media: MediaAttachment[]; documents: ClinicalDocument[]; settings: ClinicSettings; monthlyCosts: Record<string, MonthCosts> };
 export const KEY = 'raiz-viva-clinica-v1';
 export const IMAGE_DB = 'raiz-viva-images-v1';
 export type DailyVerse = { reference:string; theme:string; reflection:string };
@@ -136,3 +146,25 @@ export function serviceCost(service: Service, supplies: Supply[]): number {
 
 // Clínica nova já começa com os atendimentos-modelo montados a partir dos insumos padrão.
 initial.services = legacyServices(initial.supplies, initial.knowledgeCost);
+
+// Itens de custo do mês. Mês sem lançamento herda os itens marcados como "repete todo mês" do último mês lançado.
+export function costItemsFor(store: Pick<Store, 'monthlyCosts'>, month: string): { items: CostItem[]; inherited: boolean } {
+  const entry = store.monthlyCosts[month];
+  if (entry?.items) return { items: entry.items, inherited: false };
+  if (entry && (entry.fixedCosts || entry.investments)) {
+    return { items: [
+      ...(entry.fixedCosts ? [{ id: `${month}-fixo`, category: 'fixo' as const, name: 'Custos fixos', value: entry.fixedCosts }] : []),
+      ...(entry.investments ? [{ id: `${month}-invest`, category: 'parcela' as const, name: 'Parcelas e investimentos', value: entry.investments }] : []),
+    ], inherited: false };
+  }
+  const previous = Object.keys(store.monthlyCosts).filter(key => key < month && store.monthlyCosts[key]?.items?.some(item => item.recurring)).sort().pop();
+  const items = previous ? (store.monthlyCosts[previous].items || []).filter(item => item.recurring) : [];
+  return { items, inherited: items.length > 0 };
+}
+
+export const costTotal = (store: Pick<Store, 'monthlyCosts'>, month: string) => costItemsFor(store, month).items.reduce((sum, item) => sum + item.value, 0);
+
+export function monthCostsFrom(items: CostItem[]): MonthCosts {
+  const fixedCosts = items.filter(item => item.category === 'fixo').reduce((sum, item) => sum + item.value, 0);
+  return { items, fixedCosts, investments: items.reduce((sum, item) => sum + item.value, 0) - fixedCosts };
+}

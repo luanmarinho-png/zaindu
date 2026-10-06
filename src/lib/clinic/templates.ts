@@ -1,6 +1,7 @@
 // Modelos de prontuário por especialidade. Cada clínica recebe uma cópia do modelo e pode acrescentar etapas próprias.
 export type FieldType = 'text' | 'textarea' | 'date' | 'select' | 'checklist';
-export type TemplateField = { key: string; label: string; type: FieldType; placeholder?: string; options?: string[]; wide?: boolean };
+// group: categoria da pergunta na anamnese (ex.: "Saúde geral"); sem ela, vale a categoria-padrão da chave.
+export type TemplateField = { key: string; label: string; type: FieldType; placeholder?: string; options?: string[]; wide?: boolean; group?: string };
 export type RecordSection = { id: string; title: string; fields: TemplateField[]; custom?: boolean };
 export type TemplateId = 'tricologia' | 'dermatologia' | 'geral';
 // edited: a clínica personalizou o prontuário inteiro (perguntas do modelo inclusive); vale o que está salvo.
@@ -177,3 +178,22 @@ export function resolveRecord(record: Partial<RecordConfig> | undefined): Record
 }
 
 export const allNoteFields = (record: RecordConfig) => record.sections.flatMap(section => section.fields);
+
+// Categorias da anamnese, na ordem em que aparecem.
+export const ANAMNESIS_GROUPS = ['Identificação', 'Queixa e história', 'Saúde geral', 'Hábitos e cuidados', 'Tratamentos e exames', 'Outras perguntas'];
+const DEFAULT_GROUP: Record<string, string> = {
+  birthDate: 'Identificação', occupation: 'Identificação', communicationStyle: 'Identificação',
+  chiefComplaint: 'Queixa e história', onset: 'Queixa e história', progression: 'Queixa e história', pattern: 'Queixa e história', symptoms: 'Queixa e história', triggers: 'Queixa e história',
+  comorbidities: 'Saúde geral', surgicalHistory: 'Saúde geral', familyHistory: 'Saúde geral', medications: 'Saúde geral', supplements: 'Saúde geral', allergies: 'Saúde geral', reproductiveHistory: 'Saúde geral', vaccination: 'Saúde geral',
+  dietAndStress: 'Hábitos e cuidados', hairCare: 'Hábitos e cuidados', chemicalTreatments: 'Hábitos e cuidados', heatAndTraction: 'Hábitos e cuidados', washRoutine: 'Hábitos e cuidados', habits: 'Hábitos e cuidados', skinCare: 'Hábitos e cuidados', sunExposure: 'Hábitos e cuidados', phototype: 'Hábitos e cuidados', cosmeticProcedures: 'Hábitos e cuidados',
+  priorTreatments: 'Tratamentos e exames', relevantTests: 'Tratamentos e exames',
+};
+export const fieldGroup = (field: TemplateField) => field.group?.trim() || DEFAULT_GROUP[field.key] || 'Outras perguntas';
+
+// Agrupa mantendo a ordem: categorias conhecidas primeiro, depois as criadas pela clínica.
+export function groupFields(fields: TemplateField[]): { title: string; fields: TemplateField[] }[] {
+  const map = new Map<string, TemplateField[]>();
+  for (const field of fields) map.set(fieldGroup(field), [...(map.get(fieldGroup(field)) || []), field]);
+  const order = (title: string) => { const index = ANAMNESIS_GROUPS.indexOf(title); return index < 0 ? ANAMNESIS_GROUPS.length - 1 : index; };
+  return [...map.entries()].sort((a, b) => order(a[0]) - order(b[0])).map(([title, list]) => ({ title, fields: list }));
+}

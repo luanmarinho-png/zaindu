@@ -7,6 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
 import { DEFAULT_MEMBER_MODULES, MODULES, ROLE_LABEL, type Access, type AccessProfile, type Module } from '@/lib/clinic/permissions';
 import { PageHeader } from './Shell';
+import { Select } from '@/components/ui/Select';
 
 export type TeamMember = { email: string; username: string; name: string; role: 'manager' | 'member'; profileId: string; modules: Module[]; professional: { specialty: string; registry: string } | null };
 type Draft = { member?: TeamMember };
@@ -226,10 +227,7 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
           <fieldset className="z-fieldset full z-module-list">
             <legend>O que pode acessar</legend>
             <Field label="Perfil de acesso" icon={IdCard} htmlFor="t-profile" hint={profile ? 'Os módulos seguem o perfil. Escolha “Personalizado” para ajustar só para esta pessoa.' : 'Acesso só desta pessoa.'} full>
-              <select id="t-profile" className="z-select" value={profileId} onChange={event => { const next = profiles.find(item => item.id === event.target.value); if (!event.target.value && profile) setModules(profile.modules); setProfileId(next?.id || ''); if (!member && next) setIsProfessional(Boolean(next.professional)); }}>
-                {profiles.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-                <option value="">Personalizado</option>
-              </select>
+              <Select id="t-profile" value={profileId} ariaLabel="Perfil de acesso" onChange={value => { const next = profiles.find(item => item.id === value); if (!value && profile) setModules(profile.modules); setProfileId(next?.id || ''); if (!member && next) setIsProfessional(Boolean(next.professional)); }} options={[...profiles.map(item => ({ value: item.id, label: item.name, hint: item.professional ? 'Profissional de saúde' : undefined })), { value: '', label: 'Personalizado', hint: 'Escolher módulos só para esta pessoa' }]} />
             </Field>
             {MODULES.map(item => (
               <label key={item.id} className={`z-switch z-module ${profile ? 'locked' : ''}`}>

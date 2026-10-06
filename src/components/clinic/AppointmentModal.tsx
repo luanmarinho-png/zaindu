@@ -9,6 +9,7 @@ import { brl, minutesOf, timeOf } from '@/lib/clinic/format';
 import { MAIN_PROFESSIONAL, type Professional } from '@/lib/clinic/permissions';
 import { findService, makeId, normalizePatient, servicePrice, type Appointment, type Store } from '@/lib/clinic/store';
 import { PatientPicker, Remember, StatusSegment } from './common';
+import { Select } from '@/components/ui/Select';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 
@@ -93,10 +94,7 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
           <PatientPicker patients={data.patients} value={patientId} onChange={setPatientId} onQuickCreate={onCreatePatient} invalid={submitted && !patientId} />
         </Field>
         <Field label="Tipo de atendimento" icon={Stethoscope} htmlFor="appt-type">
-          <select id="appt-type" className="z-select" value={type} onChange={event => chooseType(event.target.value)}>
-            {types.map(item => <option key={item}>{item}</option>)}
-            {!types.includes(type) && <option>{type}</option>}
-          </select>
+          <Select id="appt-type" value={type} ariaLabel="Tipo de atendimento" onChange={chooseType} options={[...types, ...(types.includes(type) ? [] : [type])].map(item => { const service = findService(data.services, item); return { value: item, label: item, hint: service?.duration ? `${service.duration} min` : undefined }; })} />
         </Field>
         {showMoney && (
           <Field label="Valor" icon={Wallet} htmlFor="appt-price" hint={suggested !== null ? `Sugerido: ${brl(suggested)}` : undefined}>
@@ -112,9 +110,7 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
         {data.patients.find(item => item.id === patientId) && <div className="full"><Remember patient={data.patients.find(item => item.id === patientId)!} compact /></div>}
         {professionals.length > 1 && (
           <Field label="Profissional" icon={UserRoundCog} htmlFor="appt-pro" full>
-            <select id="appt-pro" className="z-select" value={professionalId || MAIN_PROFESSIONAL} onChange={event => setProfessionalId(event.target.value === MAIN_PROFESSIONAL ? '' : event.target.value)}>
-              {professionals.map(item => <option key={item.id} value={item.id}>{item.name}{item.specialty ? ` · ${item.specialty}` : ''}</option>)}
-            </select>
+            <Select id="appt-pro" value={professionalId || MAIN_PROFESSIONAL} ariaLabel="Profissional" onChange={value => setProfessionalId(value === MAIN_PROFESSIONAL ? '' : value)} options={professionals.map(item => ({ value: item.id, label: item.name, hint: item.specialty || undefined }))} />
           </Field>
         )}
         <Field label="Duração" icon={Timer} full>
