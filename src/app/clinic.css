@@ -275,7 +275,6 @@ a.z-close { color: var(--sc-ink-muted); }
   .z-alerts { grid-template-columns: 1fr; }
   .z-card { padding: 18px; }
   .z-patient-row { flex-wrap: wrap; }
-  .z-patient-row .z-badge { order: 3; }
   .z-patient-row .z-row-actions, .z-clinic-row .z-row-actions { width: 100%; justify-content: flex-end; }
   .z-monthnav-label { min-width: 104px; }
   .z-service-item { grid-template-columns: minmax(0, 1fr) 96px 32px; }
@@ -537,7 +536,6 @@ a.z-close { color: var(--sc-ink-muted); }
   .z-types-table td[data-label], .z-cost-table td[data-label] { width: auto !important; }
   .z-step-fields li, .z-step-fields li:has(.z-step-options) { grid-template-columns: 1fr !important; }
   .z-step-fields li > * { grid-column: auto !important; }
-  .z-patient-row .z-badge { margin-left: 50px; }
 }
 /* Papel timbrado: miniaturas reais do documento (A4 reduzido) */
 .z-letterheads { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
@@ -604,4 +602,22 @@ a.z-close { color: var(--sc-ink-muted); }
   .z-qgroup-tools .z-row-actions { flex-wrap: wrap; }
   .z-qgroup-body { padding: 0 10px 12px; }
   .z-question-body { padding: 10px; }
+}
+/* Pacientes: no computador a meta fica numa linha; no celular cada paciente vira um cartão */
+.z-patient-meta { display: flex; flex-wrap: wrap; column-gap: 6px; }
+.z-patient-meta span + span::before { content: '·'; margin-right: 6px; }
+@media (max-width: 720px) {
+  .z-patients { padding: 12px; }
+  .z-patient-list { gap: 10px; }
+  .z-patient-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; grid-template-areas: 'avatar main plan' 'actions actions actions'; align-items: center; gap: 10px 12px; padding: 12px; border: 0; border-radius: var(--sc-radius-field); background: var(--sc-surface); box-shadow: var(--sc-inner-100); min-height: 0; }
+  .z-patient-row:last-child { border-bottom: 0; }
+  .z-patient-row > .z-avatar { grid-area: avatar; }
+  .z-patient-row > .z-patient-main { grid-area: main; }
+  .z-patient-row > .z-patient-plan { grid-area: plan; order: 0; margin: 0; align-self: start; }
+  .z-patient-meta { display: grid; gap: 1px; }
+  .z-patient-meta span + span::before { content: none; }
+  .z-patient-main small { white-space: normal; }
+  .z-patient-row .z-patient-actions { grid-area: actions; width: auto; display: grid; grid-template-columns: auto auto 1fr; gap: 8px; padding-top: 10px; border-top: 1px solid var(--sc-border); }
+  .z-patient-actions .z-close { width: 40px; height: 40px; border-radius: 12px; background: var(--sc-card); box-shadow: var(--sc-shadow-100); }
+  .z-patient-actions .z-btn { justify-self: end; min-height: 40px; }
 }

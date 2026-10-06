@@ -48,12 +48,13 @@ export function Patients({ data, onNew, onEdit, onOpenRecord }: Props) {
                   <span className="z-avatar">{(patient.socialName || patient.name).slice(0, 1).toUpperCase()}</span>
                   <div className="z-patient-main">
                     <strong>{patient.socialName || patient.name}</strong>
-                    <small className="t-muted">
-                      {[age !== null ? `${age} anos` : '', patient.phone, visit ? `última consulta ${formatDate(visit)}` : 'sem consulta realizada'].filter(Boolean).join(' · ')}
+                    <small className="t-muted z-patient-meta">
+                      <span>{[age !== null ? `${age} anos` : '', patient.phone].filter(Boolean).join(' · ') || 'Sem telefone'}</span>
+                      <span>{visit ? `Última consulta ${formatDate(visit)}` : 'Sem consulta realizada'}</span>
                     </small>
                   </div>
-                  <span className={`z-badge sm ${patient.insuranceType === 'Convênio' ? 'info' : ''}`}>{patient.insuranceType === 'Convênio' ? patient.insuranceName || 'Convênio' : 'Particular'}</span>
-                  <div className="z-row-actions">
+                  <span className={`z-badge sm z-patient-plan ${patient.insuranceType === 'Convênio' ? 'info' : ''}`}>{patient.insuranceType === 'Convênio' ? patient.insuranceName || 'Convênio' : 'Particular'}</span>
+                  <div className="z-row-actions z-patient-actions">
                     {patient.phone && <a className="z-close" href={`https://wa.me/55${patient.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" aria-label={`WhatsApp de ${patient.name}`} title="WhatsApp"><Phone /></a>}
                     <button type="button" className="z-close" onClick={() => onEdit(patient)} aria-label={`Editar ${patient.name}`} title="Editar"><Pencil /></button>
                     {onOpenRecord && <button type="button" className="z-btn secondary sm" onClick={() => onOpenRecord(patient.id)}><ClipboardList />Prontuário</button>}
