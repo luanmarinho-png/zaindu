@@ -28,6 +28,8 @@ export function Modal({ title, description, onClose, children, footer, size = 'm
     try { localStorage.setItem('zaindu-drawer-width', String(clamped)); } catch {}
   };
   const wide = typeof window !== 'undefined' && width >= window.innerWidth * 0.8;
+  // No celular o painel ocupa a tela toda; a largura ajustável só vale no computador.
+  const compact = typeof window !== 'undefined' && window.innerWidth <= 720;
   function startResize(event: React.PointerEvent) {
     event.preventDefault();
     const move = (e: PointerEvent) => setDrawerWidth(window.innerWidth - e.clientX);
@@ -70,7 +72,7 @@ export function Modal({ title, description, onClose, children, footer, size = 'm
 
   return (
     <div className={`z-overlay ${drawer ? 'drawer' : ''}`} onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
-      <div ref={dialogRef} className={`z-dialog ${size === 'lg' ? 'lg' : ''} ${drawer ? 'z-drawer' : ''}`} style={drawer ? { width } : undefined} role="dialog" aria-modal="true" aria-labelledby="z-dialog-title">
+      <div ref={dialogRef} className={`z-dialog ${size === 'lg' ? 'lg' : ''} ${drawer ? 'z-drawer' : ''}`} style={drawer && !compact ? { width } : undefined} role="dialog" aria-modal="true" aria-labelledby="z-dialog-title">
         {drawer && <div className="z-drawer-handle" onPointerDown={startResize} role="separator" aria-orientation="vertical" aria-label="Arraste para ajustar a largura" />}
         {onSubmit
           ? <form onSubmit={onSubmit} style={{ display: 'contents' }}>{head}{body}{foot}</form>
