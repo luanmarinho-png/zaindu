@@ -20,40 +20,135 @@ export const DOCUMENT_KINDS: Record<DocumentKind, { title: string; template: (pa
 
 const escape = (text: string) => text.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char] || char));
 
-// Documento A4 com o timbre da clínica (logo, cor, profissional e registro). autoPrint abre a impressão ao carregar.
-export function documentHtml(document: ClinicalDocument, patient: Patient, settings: ClinicSettings, brand: Brand | null, professional: Professional | undefined, autoPrint = true): string {
-  const color = brand?.color && !isLightColor(brand.color) ? brand.color : '#2e2e30';
-  const logo = brand?.logo ? `<img src="${brand.logo}" alt="" class="logo">` : `<span class="logo mark">${escape((settings.clinicName || 'C').slice(0, 1).toUpperCase())}</span>`;
-  const watermark = brand?.logo ? `<div class="watermark" aria-hidden="true"><img src="${brand.logo}" alt=""></div>` : `<div class="watermark" aria-hidden="true"><span>${escape((settings.clinicName || 'C').slice(0, 1).toUpperCase())}</span></div>`;
+export type LetterheadId = 'classico' | 'diagonal' | 'onda' | 'linhas';
+export const LETTERHEADS: { id: LetterheadId; name: string; hint: string }[] = [
+  { id: 'classico', name: 'Clássico', hint: 'Logo no topo com linha na cor da clínica e marca d’água discreta' },
+  { id: 'diagonal', name: 'Diagonal', hint: 'Faixas inclinadas no topo e no rodapé, contatos com ícones' },
+  { id: 'onda', name: 'Onda', hint: 'Cabeçalho e rodapé coloridos com curva e logo grande ao centro' },
+  { id: 'linhas', name: 'Linhas', hint: 'Barras finas, contatos no topo e logo esmaecido ao fundo' },
+];
+export const isLetterhead = (value: unknown): value is LetterheadId => LETTERHEADS.some(item => item.id === value);
+
+// Ícones de contato (traço, estilo Lucide) para o rodapé.
+const ICON: Record<string, string> = {
+  phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.9.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+  mail: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/>',
+  pin: '<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  web: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/>',
+  insta: '<rect x="2" y="2" width="20" height="20" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r=".5"/>',
+};
+const icon = (name: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[name]}</svg>`;
+
+// Documento A4 com o papel timbrado escolhido pela clínica, sempre na cor e com o logo dela.
+// Cabeçalho, rodapé e decoração ficam fixos e se repetem em cada página; a tabela reserva o espaço deles.
+export function documentHtml(document: ClinicalDocument, patient: Patient, settings: ClinicSettings, brand: Brand | null, professional: Professional | undefined, autoPrint = true, layout?: LetterheadId): string {
+  const light = Boolean(brand?.color && isLightColor(brand.color));
+  const color = brand?.color && !light ? brand.color : '#2e2e30';
+  // Tom de apoio: a própria cor clareada (cor clara da clínica entra como apoio quando é off-white).
+  const accent = light && brand?.color ? brand.color : `color-mix(in srgb, ${color} 45%, #fff)`;
+  const style: LetterheadId = layout || (isLetterhead(settings.letterhead) ? settings.letterhead : 'classico');
+  const initial = escape((settings.clinicName || 'C').slice(0, 1).toUpperCase());
+  const logo = brand?.logo ? `<img src="${brand.logo}" alt="" class="logo">` : `<span class="logo mark">${initial}</span>`;
+  const bigLogo = brand?.logo ? `<img src="${brand.logo}" alt="">` : `<span class="mark">${initial}</span>`;
   const signer = professional || { name: settings.professionalName, registry: settings.professionalRegistry, specialty: settings.specialty };
+  const contacts = ([['phone', settings.clinicPhone], ['mail', settings.clinicEmail], ['insta', settings.clinicInstagram], ['web', settings.clinicWebsite], ['pin', settings.clinicAddress]] as [string, string | undefined][])
+    .filter(([, value]) => value?.trim()).map(([name, value]) => `<span>${icon(name)}<em>${escape(String(value))}</em></span>`).join('');
+  const brandBlock = `<div class="brand">${logo}<div><strong>${escape(settings.clinicName)}</strong><small>${escape(signer.specialty || settings.specialty || '')}</small></div></div>`;
+  const brandWhite = `<div class="brand on-color">${brand?.logo ? `<img src="${brand.logo}" alt="" class="logo">` : `<span class="logo mark inverse">${initial}</span>`}<div><strong>${escape(settings.clinicName)}</strong><small>${escape(signer.specialty || settings.specialty || '')}</small></div></div>`;
+
+  const layouts: Record<LetterheadId, { head: number; foot: number; deco: string; css: string }> = {
+    classico: {
+      head: 38, foot: 22,
+      deco: `<div class="fixed top">${brandBlock}<div class="rule"></div></div>
+        <div class="fixed bottom contacts">${contacts}</div>
+        <div class="watermark corner">${bigLogo}</div>`,
+      css: `.top { top: 14mm; left: 20mm; right: 20mm; } .rule { height: 2px; margin-top: 12px; background: ${color}; }
+        .bottom { bottom: 10mm; left: 20mm; right: 20mm; } .corner { right: 12mm; bottom: 18mm; width: 60mm; height: 60mm; }`,
+    },
+    diagonal: {
+      head: 50, foot: 30,
+      deco: `<svg class="fixed page" viewBox="0 0 210 297" preserveAspectRatio="none" aria-hidden="true">
+          <polygon points="88,0 210,0 210,5 52,24" fill="${color}"/><polygon points="40,28 54,22.6 56.5,23.4 42.5,29" fill="${accent}"/>
+          <polygon points="150,297 210,297 210,226 172,241" fill="${color}"/><polygon points="139,297 147,297 168,242.6 162,245" fill="${accent}"/>
+        </svg>
+        <div class="fixed top">${brandBlock}</div>
+        <div class="fixed bottom contacts stacked">${contacts}</div>`,
+      css: `.top { top: 32mm; left: 20mm; } .bottom { bottom: 10mm; left: 20mm; max-width: 120mm; }`,
+    },
+    onda: {
+      head: 46, foot: 30,
+      deco: `<svg class="fixed page" viewBox="0 0 210 297" preserveAspectRatio="none" aria-hidden="true">
+          <path d="M0,0 H210 V20 C168,34 104,12 0,32 Z" fill="${color}"/>
+          <path d="M96,30 C140,22 178,30 210,22" fill="none" stroke="${accent}" stroke-width="1.4"/>
+          <rect x="0" y="279" width="210" height="1.6" fill="${accent}"/><rect x="0" y="281.6" width="210" height="15.4" fill="${color}"/>
+        </svg>
+        <div class="fixed top">${brandWhite}</div>
+        <div class="watermark center">${bigLogo}</div>
+        <div class="fixed bottom contacts on-color">${contacts}</div>`,
+      css: `.top { top: 7mm; left: 18mm; } .bottom { bottom: 4.5mm; left: 18mm; right: 18mm; justify-content: center; }
+        .center { left: 50%; top: 50%; width: 120mm; height: 120mm; transform: translate(-50%, -50%); }`,
+    },
+    linhas: {
+      head: 40, foot: 24,
+      deco: `<svg class="fixed page" viewBox="0 0 210 297" preserveAspectRatio="none" aria-hidden="true">
+          <rect x="44" y="0" width="56" height="2.6" fill="${color}"/>
+          <rect x="0" y="290" width="152" height="7" fill="${color}"/><rect x="152" y="290" width="58" height="7" fill="${accent}"/>
+        </svg>
+        <div class="watermark hero">${bigLogo}</div>
+        <div class="fixed top">${brandBlock}</div>
+        <div class="fixed side contacts stacked right">${contacts}</div>`,
+      css: `.top { top: 16mm; left: 20mm; } .side { top: 14mm; right: 20mm; max-width: 70mm; }
+        .hero { right: -10mm; top: 40mm; width: 130mm; height: 130mm; }`,
+    },
+  };
+  const chosen = layouts[style];
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escape(document.title)} · ${escape(patient.name)}</title>
 <style>
-  @page { size: A4; margin: 18mm 18mm 20mm; }
+  @page { size: A4; margin: 0; }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 400 12.5pt/1.6 Inter, 'Helvetica Neue', Arial, sans-serif; color: #1c1d20; }
-  header { display: flex; align-items: center; gap: 14px; padding-bottom: 14px; border-bottom: 2px solid ${color}; }
-  .logo { width: 52px; height: 52px; object-fit: contain; border-radius: 10px; }
+  html, body { margin: 0; }
+  body { font: 400 12pt/1.6 Inter, 'Helvetica Neue', Arial, sans-serif; color: #1c1d20; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .fixed { position: fixed; z-index: 1; }
+  .page { inset: 0; width: 210mm; height: 297mm; z-index: 0; }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand strong { display: block; font-size: 13.5pt; }
+  .brand small { color: #6b6b6b; font-size: 9.5pt; }
+  .brand.on-color strong, .brand.on-color small { color: #fff; }
+  .logo { width: 50px; height: 50px; object-fit: contain; border-radius: 10px; }
   .mark { display: grid; place-items: center; background: ${color}; color: #fff; font: 600 22pt Inter, sans-serif; }
-  header strong { display: block; font-size: 14pt; }
-  header small { color: #6b6b6b; font-size: 10pt; }
-  h1 { margin: 28px 0 6px; font-size: 16pt; font-weight: 600; letter-spacing: .02em; }
-  .patient { margin: 0 0 24px; color: #4a4a4a; font-size: 11pt; }
-  .body { white-space: pre-wrap; min-height: 320px; }
-  footer { margin-top: 48px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; font-size: 11pt; }
-  .sign { min-width: 260px; text-align: center; border-top: 1px solid #1c1d20; padding-top: 6px; }
-  .sign small { display: block; color: #6b6b6b; font-size: 10pt; }
-  /* Marca d'água: logo (ou inicial) bem clara no canto inferior direito, em todas as páginas. */
-  .watermark { position: fixed; right: 0; bottom: 0; width: 64mm; height: 64mm; opacity: .06; pointer-events: none; z-index: -1; }
-  .watermark img { width: 100%; height: 100%; object-fit: contain; }
-  .watermark span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 14mm; background: ${color}; color: #fff; font: 600 40mm/1 Inter, sans-serif; }
+  .mark.inverse { background: #fff; color: ${color}; }
+  .contacts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 9pt; color: #4a4a4a; }
+  .contacts.stacked { flex-direction: column; }
+  .contacts.right { align-items: flex-end; text-align: right; }
+  .contacts.on-color { color: #fff; }
+  .contacts span { display: inline-flex; align-items: flex-start; gap: 6px; }
+  .contacts em { font-style: normal; }
+  .contacts.right span { justify-content: flex-end; }
+  .contacts svg { width: 11px; height: 11px; flex: none; margin-top: 3px; color: ${color}; }
+  .contacts.on-color svg { color: #fff; }
+  .watermark { position: fixed; opacity: .06; z-index: 0; pointer-events: none; }
+  .watermark img, .watermark .mark { width: 100%; height: 100%; object-fit: contain; border-radius: 16mm; font-size: 48mm; }
+  table.sheet { width: 100%; border-collapse: collapse; position: relative; z-index: 2; }
+  .sheet td { padding: 0 20mm; }
+  .head-space { height: ${chosen.head}mm; } .foot-space { height: ${chosen.foot}mm; }
+  h1 { margin: 6mm 0 2mm; font-size: 16pt; font-weight: 600; letter-spacing: .02em; color: ${color}; }
+  .patient { margin: 0 0 7mm; color: #4a4a4a; font-size: 10.5pt; }
+  .body { white-space: pre-wrap; min-height: 90mm; }
+  footer { margin-top: 14mm; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; font-size: 10.5pt; break-inside: avoid; }
+  .sign { min-width: 70mm; text-align: center; border-top: 1px solid #1c1d20; padding-top: 6px; }
+  .sign small { display: block; color: #6b6b6b; font-size: 9.5pt; }
+  ${chosen.css}
 </style></head><body>
-${watermark}
-<header>${logo}<div><strong>${escape(settings.clinicName)}</strong><small>${escape(signer.specialty || settings.specialty || '')}</small></div></header>
+${chosen.deco}
+<table class="sheet"><thead><tr><td><div class="head-space"></div></td></tr></thead>
+<tbody><tr><td>
 <h1>${escape(document.title)}</h1>
 <p class="patient">Paciente: <b>${escape(patient.name)}</b>${patient.cpf ? ` · CPF ${escape(maskCpf(patient.cpf))}` : ''}</p>
 <div class="body">${escape(document.body)}</div>
 <footer><span>${escape(formatDate(document.date, { day: '2-digit', month: 'long', year: 'numeric' }))}</span>
 <span class="sign">${escape(signer.name)}${signer.registry ? `<small>${escape(signer.registry)}</small>` : ''}</span></footer>
+</td></tr></tbody>
+<tfoot><tr><td><div class="foot-space"></div></td></tr></tfoot></table>
 ${autoPrint ? '<script>window.onload = () => { window.focus(); window.print(); };</script>' : ''}
 </body></html>`;
   return html;

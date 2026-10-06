@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, BadgeCheck, Building2, ClipboardList, Eye, History, ImagePlus, ListChecks, Palette, Plus, RotateCcw, Stethoscope, Trash2, UserRound, Users, X } from 'lucide-react';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
@@ -13,6 +13,8 @@ import { MoneyInput } from '@/components/ui/MoneyInput';
 import { brl } from '@/lib/clinic/format';
 import { ANAMNESIS_GROUPS, FIELD_TYPES, fieldGroup, groupFields, recordFromTemplate, TEMPLATES, type FieldType, type RecordConfig, type RecordSection, type TemplateField } from '@/lib/clinic/templates';
 import { TemplateInput } from './Record';
+import { documentHtml, LETTERHEADS, type LetterheadId } from '@/lib/clinic/documentHtml';
+import { AtSign, Globe, Mail, MapPin, Phone, Printer } from 'lucide-react';
 import { PageHeader } from './Shell';
 import { Team } from './Team';
 import type { ClinicProps } from './types';
@@ -40,6 +42,7 @@ export function Settings({ data, setData, access, brand = null, onBrandChange }:
       </div>
       {tab === 'clinica' && <>
         {manager && brand && onBrandChange && <Identity brand={brand} onChange={onBrandChange} />}
+        <Letterhead data={data} setData={setData} brand={brand} />
         <section className="z-card white z-section">
           <header className="z-section-head"><div><h2 className="t-h1">Profissional responsável</h2><p className="t-body t-muted">Aparece no menu, na agenda e assina os documentos quando ninguém da equipe é escolhido.</p></div></header>
           <div className="z-form-grid three">
@@ -328,4 +331,61 @@ function ServiceTypes({ data, setData }: ClinicProps) {
       ) : <div className="z-empty"><span>Nenhum tipo cadastrado. Crie, por exemplo, “Consulta” e “Retorno”.</span></div>}
     </section>
   );
+}
+
+// Papel timbrado: modelos que sempre usam a cor e o logo da clínica, com pré-visualização ao vivo e contatos do rodapé.
+function Letterhead({ data, setData, brand }: ClinicProps & { brand: Brand | null }) {
+  const set = (patch: Partial<ClinicSettings>) => setData(current => ({ ...current, settings: { ...current.settings, ...patch } }));
+  const chosen = (LETTERHEADS.some(item => item.id === data.settings.letterhead) ? data.settings.letterhead : 'classico') as LetterheadId;
+  const sample = { id: 'exemplo', patientId: 'exemplo', kind: 'receita' as const, title: 'Receituário', body: 'Uso oral\n\n1. Medicamento de exemplo 10 mg ———— 30 comprimidos\n   Tomar 1 comprimido ao dia, pela manhã.\n\nUso tópico\n\n1. Loção de exemplo ———— 1 frasco\n   Aplicar à noite.', date: new Date().toISOString().slice(0, 10), professionalId: '', createdAt: '' };
+  const patient = { id: 'exemplo', name: 'Paciente Exemplo' } as Parameters<typeof documentHtml>[1];
+  const html = (layout: LetterheadId) => documentHtml(sample, patient, data.settings, brand, undefined, false, layout);
+  function testPrint() {
+    const view = window.open('', '_blank', 'width=900,height=1000');
+    if (!view) return;
+    view.document.open();
+    view.document.write(documentHtml(sample, patient, data.settings, brand, undefined, true, chosen));
+    view.document.close();
+  }
+  const contact = (key: 'clinicPhone' | 'clinicEmail' | 'clinicInstagram' | 'clinicWebsite' | 'clinicAddress', label: string, Icon: typeof Phone, placeholder: string, full?: boolean) => (
+    <Field label={label} icon={Icon} htmlFor={`lh-${key}`} full={full}><input id={`lh-${key}`} className="z-input" value={data.settings[key] || ''} placeholder={placeholder} onChange={event => set({ [key]: event.target.value })} /></Field>
+  );
+  return (
+    <section className="z-card white z-section">
+      <header className="z-section-head">
+        <div><h2 className="t-h1">Papel timbrado</h2><p className="t-body t-muted">Modelo usado em receitas, atestados e demais documentos. Todos seguem a cor e o logo da clínica.</p></div>
+        <button type="button" className="z-btn secondary" onClick={testPrint}><Printer />Imprimir teste</button>
+      </header>
+      <div className="z-letterheads" role="radiogroup" aria-label="Modelo de papel timbrado">
+        {LETTERHEADS.map(item => (
+          <button key={item.id} type="button" role="radio" aria-checked={chosen === item.id} className="z-letterhead" onClick={() => set({ letterhead: item.id })}>
+            <Paper title={`Modelo ${item.name}`} html={html(item.id)} />
+            <strong>{item.name}</strong>
+            <small>{item.hint}</small>
+          </button>
+        ))}
+      </div>
+      <div className="z-form-grid">
+        {contact('clinicPhone', 'Telefone / WhatsApp', Phone, '(11) 99999-0000')}
+        {contact('clinicEmail', 'E-mail', Mail, 'contato@clinica.com.br')}
+        {contact('clinicInstagram', 'Instagram', AtSign, '@clinica')}
+        {contact('clinicWebsite', 'Site', Globe, 'clinica.com.br')}
+        {contact('clinicAddress', 'Endereço', MapPin, 'Rua, número – bairro, cidade – UF', true)}
+      </div>
+    </section>
+  );
+}
+
+// Miniatura de uma página A4 (794 × 1123 px) encolhida para a largura do cartão.
+function Paper({ title, html }: { title: string; html: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const [scale, setScale] = useState(0.2);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / 794));
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return <span ref={ref} className="z-letterhead-paper"><iframe title={title} srcDoc={html} tabIndex={-1} aria-hidden="true" style={{ transform: `scale(${scale})` }} /></span>;
 }

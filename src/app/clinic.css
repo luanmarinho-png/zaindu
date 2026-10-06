@@ -539,3 +539,14 @@ a.z-close { color: var(--sc-ink-muted); }
   .z-step-fields li > * { grid-column: auto !important; }
   .z-patient-row .z-badge { margin-left: 50px; }
 }
+/* Papel timbrado: miniaturas reais do documento (A4 reduzido) */
+.z-letterheads { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
+.z-letterhead { display: grid; gap: 4px; padding: 10px; border: 1px solid var(--sc-border); border-radius: var(--sc-radius-field); background: var(--sc-card); box-shadow: var(--sc-shadow-100); text-align: left; font: inherit; color: var(--sc-ink); cursor: pointer; transition: border-color var(--sc-fast) var(--sc-ease), box-shadow var(--sc-fast) var(--sc-ease), transform var(--sc-fast) var(--sc-ease); }
+.z-letterhead:hover { transform: translateY(-2px); box-shadow: var(--sc-shadow-300); }
+.z-letterhead[aria-checked='true'] { border-color: var(--sc-brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sc-brand) 22%, transparent); }
+.z-letterhead strong { font-weight: 600; font-size: 14px; margin-top: 6px; }
+.z-letterhead small { color: var(--sc-ink-muted); font-size: 12px; line-height: 16px; }
+.z-letterhead-paper { position: relative; display: block; width: 100%; aspect-ratio: 210 / 297; overflow: hidden; border-radius: 8px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.z-letterhead-paper iframe { position: absolute; top: 0; left: 0; width: 794px; height: 1123px; border: 0; transform-origin: 0 0; pointer-events: none; }
+.z-letterhead { align-content: start; }
+@media (max-width: 720px) { .z-letterheads { grid-template-columns: 1fr 1fr; gap: 10px; } .z-letterhead small { display: none; } }
