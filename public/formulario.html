@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Formulário</title>
+<link rel="icon" href="/zaindu-mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Tokens do DS SocialCof (socialcof-tokens.css), copiados para a página ficar autônoma. */
+:root {
+  --sc-brand: #e2263c;
+  --sc-brand-hover: #c91f33;
+  --sc-brand-soft: rgba(226,38,60,.08);
+  --sc-ink: #1c1d20;
+  --sc-ink-muted: #6b6b6b;
+  --sc-surface: #f4f4f5;
+  --sc-card: #ffffff;
+  --sc-border: rgba(28,29,32,.08);
+  --sc-border-strong: rgba(28,29,32,.16);
+  --sc-muted: oklch(96.1% 0 0);
+  --sc-hover: oklch(97.31% 0 0);
+  --sc-shadow-card: 0 2px 12px rgba(28,29,32,.06);
+  --sc-shadow-dialog: 2px 2px 8px -1px rgba(0,0,0,.08) inset, 0 0 12px -1px rgba(0,0,0,.04) inset, 0 4px 8px -2px rgba(0,0,0,.08), 0 16px 40px rgba(0,0,0,.06);
+  --sc-shadow-button: 1.1px 1.8px .6px -1.2px rgba(255,255,255,.8) inset, 5px 4px 6px -2px rgba(0,0,0,.07) inset, -1.5px -2.6px .5px -2px rgba(255,255,255,.7) inset, 0 4px 8px -2px rgba(0,0,0,.2), 0 10px 40px rgba(0,0,0,.06);
+  --sc-button-from: #292929;
+  --sc-button-to: #3c3c3c;
+  --sc-button-hover-from: #434343;
+  --sc-button-hover-to: #555555;
+  --sc-on-button: #ffffff;
+  --sc-success: oklch(36.38% .0737 164.7);
+  --sc-success-soft: oklch(93.07% .0384 173.93);
+  --sc-font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+  --sc-radius-card: 20px;
+  --sc-radius-dialog: 32px;
+  --sc-radius-field: 16px;
+  --sc-radius-pill: 9999px;
+  --sc-motion: 150ms cubic-bezier(.4,0,.2,1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --sc-ink: #ededf0; --sc-ink-muted: #9a9aa4; --sc-surface: #111113; --sc-card: #1c1d20;
+    --sc-border: rgba(237,237,240,.08); --sc-border-strong: rgba(237,237,240,.18);
+    --sc-muted: #26272b; --sc-hover: #26272b; --sc-brand-soft: rgba(226,38,60,.16);
+    --sc-success: oklch(86.43% .0751 172.32); --sc-success-soft: oklch(23.64% .0448 167.33);
+    --sc-shadow-card: 0 2px 12px rgba(0,0,0,.4); --sc-shadow-dialog: 0 16px 40px rgba(0,0,0,.45);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --sc-ink: #ededf0; --sc-ink-muted: #9a9aa4; --sc-surface: #111113; --sc-card: #1c1d20;
+  --sc-border: rgba(237,237,240,.08); --sc-border-strong: rgba(237,237,240,.18);
+  --sc-muted: #26272b; --sc-hover: #26272b; --sc-brand-soft: rgba(226,38,60,.16);
+  --sc-success: oklch(86.43% .0751 172.32); --sc-success-soft: oklch(23.64% .0448 167.33);
+  --sc-shadow-card: 0 2px 12px rgba(0,0,0,.4); --sc-shadow-dialog: 0 16px 40px rgba(0,0,0,.45);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  min-height: 100svh;
+  background: var(--sc-surface);
+  color: var(--sc-ink);
+  font-family: var(--sc-font-ui);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  padding: max(24px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom));
+}
+.shell { width: min(100%, 680px); margin: 0 auto; }
+
+.top { display: flex; justify-content: flex-end; min-height: 20px; margin-bottom: 8px; }
+.saved { font-size: 12px; color: var(--sc-ink-muted); opacity: 0; transition: opacity var(--sc-motion); }
+.saved.on { opacity: 1; }
+
+.progress { margin-bottom: 16px; }
+.progress-meta { display: flex; justify-content: space-between; font-size: 13px; color: var(--sc-ink-muted); margin-bottom: 8px; font-variant-numeric: tabular-nums; }
+.progress-bar { height: 6px; background: var(--sc-muted); border-radius: var(--sc-radius-pill); overflow: hidden; }
+.progress-fill { height: 100%; width: 0; background: var(--sc-brand); border-radius: inherit; transition: width 300ms cubic-bezier(.4,0,.2,1); }
+
+.card {
+  background: var(--sc-card);
+  border: 1px solid var(--sc-border);
+  border-radius: var(--sc-radius-dialog);
+  box-shadow: var(--sc-shadow-dialog);
+  padding: 40px;
+}
+.eyebrow { font-size: 13px; font-weight: 500; color: var(--sc-brand); margin: 0 0 8px; }
+h1, h2 { margin: 0 0 12px; font-weight: 700; letter-spacing: -.025em; line-height: 1.2; text-wrap: balance; }
+h1 { font-size: 30px; }
+h2 { font-size: 24px; }
+.lead { color: var(--sc-ink-muted); margin: 0 0 28px; text-wrap: pretty; }
+
+.facts { display: grid; gap: 10px; margin: 0 0 32px; padding: 0; list-style: none; }
+.facts li { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; background: var(--sc-muted); border-radius: var(--sc-radius-card); font-size: 14px; }
+.facts svg { flex: none; margin-top: 2px; color: var(--sc-brand); }
+
+.q { padding: 24px 0; border-top: 1px solid var(--sc-border); }
+.q:first-of-type { border-top: 0; padding-top: 4px; }
+.q-label { display: flex; gap: 10px; font-weight: 600; margin-bottom: 4px; }
+.q-num { flex: none; color: var(--sc-ink-muted); font-weight: 500; font-variant-numeric: tabular-nums; min-width: 22px; }
+.q-hint { color: var(--sc-ink-muted); font-size: 13px; margin: 0 0 12px 32px; }
+.q-body { margin-left: 32px; }
+
+textarea, input[type="text"] {
+  width: 100%;
+  font: inherit;
+  font-size: 16px;
+  color: var(--sc-ink);
+  background: var(--sc-card);
+  border: 1px solid var(--sc-border-strong);
+  border-radius: var(--sc-radius-field);
+  padding: 12px 16px;
+  transition: border-color var(--sc-motion), box-shadow var(--sc-motion);
+}
+input[type="text"] { min-height: 48px; border-radius: var(--sc-radius-pill); padding: 0 20px; }
+textarea { min-height: 104px; resize: vertical; }
+textarea:focus, input[type="text"]:focus { outline: none; border-color: var(--sc-ink-muted); box-shadow: 0 0 0 3px var(--sc-border); }
+::placeholder { color: var(--sc-ink-muted); opacity: .7; }
+.extra { margin-top: 10px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { position: relative; }
+.chip input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.chip span {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px;
+  border: 1px solid var(--sc-border-strong); border-radius: var(--sc-radius-pill);
+  background: var(--sc-card); font-size: 14px; font-weight: 500; cursor: pointer; user-select: none;
+  transition: background var(--sc-motion), border-color var(--sc-motion), color var(--sc-motion), transform var(--sc-motion);
+}
+.chip:hover span { background: var(--sc-hover); }
+.chip input:checked + span { background: var(--sc-ink); border-color: var(--sc-ink); color: var(--sc-card); }
+.chip input:focus-visible + span { outline: 2px solid var(--sc-ink-muted); outline-offset: 2px; }
+.chip input:disabled + span { opacity: .4; cursor: not-allowed; }
+.chip:active span { transform: scale(.97); }
+.q-error { display: flex; align-items: center; gap: 6px; margin: 10px 0 0 32px; font-size: 13px; font-weight: 500; color: var(--sc-brand); }
+.q-error[hidden] { display: none; }
+.q.invalid textarea, .q.invalid input[type="text"]:not(.extra), .q.invalid .chip span { border-color: var(--sc-brand); }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.swatch { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 6px 4px 4px; border: 1px solid var(--sc-border-strong); border-radius: var(--sc-radius-pill); background: var(--sc-card); }
+.swatch input[type="color"] { width: 40px; height: 40px; padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; }
+.swatch input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+.swatch input[type="color"]::-webkit-color-swatch { border: 1px solid var(--sc-border-strong); border-radius: 50%; }
+.swatch input[type="color"]::-moz-color-swatch { border: 1px solid var(--sc-border-strong); border-radius: 50%; }
+.swatch-hex { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; min-width: 68px; }
+.icon-btn { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: var(--sc-ink-muted); cursor: pointer; font: inherit; font-size: 18px; line-height: 1; }
+.icon-btn:hover { background: var(--sc-hover); color: var(--sc-ink); }
+.icon-btn:focus-visible { outline: 2px solid var(--sc-ink-muted); outline-offset: 2px; }
+.add-color { min-height: 48px; padding: 0 18px; border: 1px dashed var(--sc-border-strong); border-radius: var(--sc-radius-pill); background: transparent; color: var(--sc-ink); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.add-color:hover { background: var(--sc-hover); }
+.files { margin-top: 12px; }
+.file-pick { position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 1px solid var(--sc-border-strong); border-radius: var(--sc-radius-pill); font-size: 14px; font-weight: 500; cursor: pointer; }
+.file-pick:hover { background: var(--sc-hover); }
+.file-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.file-pick:focus-within { outline: 2px solid var(--sc-ink-muted); outline-offset: 2px; }
+.file-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
+.file-list li { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 14px; background: var(--sc-muted); border-radius: 12px; font-size: 14px; }
+.file-list .name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-list .meta { color: var(--sc-ink-muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.file-error { color: var(--sc-brand); font-size: 13px; margin: 8px 0 0; }
+.limit-note { font-size: 12px; color: var(--sc-ink-muted); margin-top: 8px; font-variant-numeric: tabular-nums; }
+
+.actions { display: flex; gap: 12px; justify-content: space-between; align-items: center; margin-top: 32px; flex-wrap: wrap; }
+.actions .spacer { flex: 1; }
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 48px; padding: 0 24px; border-radius: var(--sc-radius-pill);
+  font: inherit; font-weight: 500; font-size: 15px; cursor: pointer; text-decoration: none;
+  border: 1px solid transparent; transition: background var(--sc-motion), transform var(--sc-motion), border-color var(--sc-motion);
+}
+.btn:active { transform: scale(.98); }
+.btn:focus-visible { outline: 2px solid var(--sc-ink-muted); outline-offset: 3px; }
+.btn-primary { background: linear-gradient(135deg, var(--sc-button-from), var(--sc-button-to)); color: var(--sc-on-button); box-shadow: var(--sc-shadow-button); }
+.btn-primary:hover { background: linear-gradient(135deg, var(--sc-button-hover-from), var(--sc-button-hover-to)); }
+.btn-brand { background: var(--sc-brand); color: #fff; }
+.btn-brand:hover { background: var(--sc-brand-hover); }
+.btn-ghost { background: transparent; color: var(--sc-ink); border-color: var(--sc-border-strong); }
+.btn-ghost:hover { background: var(--sc-hover); }
+.btn-link { background: none; border: 0; color: var(--sc-ink-muted); padding: 0 8px; min-height: 44px; }
+.btn-link:hover { color: var(--sc-ink); }
+.btn[disabled] { opacity: .5; pointer-events: none; }
+
+.review-section { margin-top: 24px; }
+.review-section h3 { font-size: 14px; font-weight: 600; color: var(--sc-ink-muted); margin: 0 0 8px; display: flex; justify-content: space-between; align-items: center; }
+.review-section h3 button { font: inherit; font-size: 13px; color: var(--sc-ink); background: none; border: 0; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; min-height: 44px; }
+.review-list { margin: 0; padding: 16px 20px; background: var(--sc-muted); border-radius: var(--sc-radius-card); }
+.review-list dt { font-size: 13px; color: var(--sc-ink-muted); }
+.review-list dd { margin: 2px 0 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.review-list dd:last-child { margin-bottom: 0; }
+.review-list dd.empty { color: var(--sc-ink-muted); font-style: italic; }
+
+.send-grid { display: grid; gap: 10px; margin-top: 8px; }
+.notice { padding: 14px 16px; border-radius: var(--sc-radius-card); font-size: 14px; margin-top: 16px; }
+.notice.ok { background: var(--sc-success-soft); color: var(--sc-success); }
+.notice.err { background: var(--sc-brand-soft); color: var(--sc-brand); }
+
+.done-icon { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; background: var(--sc-success-soft); color: var(--sc-success); margin-bottom: 20px; }
+
+
+.screen { animation: enter 220ms cubic-bezier(.4,0,.2,1); }
+@keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .screen { animation: none; } .progress-fill { transition: none; } }
+
+@media (max-width: 600px) {
+  .card { padding: 28px 20px; border-radius: 24px; }
+  h1 { font-size: 26px; }
+  h2 { font-size: 22px; }
+  .q-hint, .q-body, .q-error { margin-left: 0; }
+  .actions { flex-direction: column-reverse; align-items: stretch; }
+  .actions .spacer { display: none; }
+  .btn { width: 100%; }
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="top">
+    <span class="saved" id="saved" aria-live="polite">Rascunho salvo</span>
+  </header>
+
+  <div class="progress" id="progress" hidden>
+    <div class="progress-meta"><span id="progress-label"></span><span id="progress-count"></span></div>
+    <div class="progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </div>
+
+  <main class="card" id="app"></main>
+</div>
+
+<script>
+/* Para onde as respostas vão. Preencha antes de subir no domínio.
+   endpoint: URL que aceita POST em JSON (Formspree, Getform, uma função própria). Vazio = sem envio automático.
+   email / whatsapp: usados como alternativa quando não há endpoint. WhatsApp só com números, com DDI (ex.: 5511999999999). */
+const CONFIG = {
+  endpoint: '/api/forms',
+  email: '',
+  whatsapp: '',
+};
+
+// Formulário criado na área do admin: perguntas, textos e cor vêm de /api/public-forms/<identificador>.
+const SLUG = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop() || '');
+let META = { slug: SLUG, title: 'Formulário', eyebrow: '', greeting: 'Olá', intro: '', thanksTitle: 'Obrigado', thanksText: 'Recebemos suas respostas.', color: '' };
+let SECTIONS = [];
+let TOTAL_Q = 0;
+let STORAGE_KEY = `formulario-${SLUG}-v1`;
+const app = document.getElementById('app');
+let state = { step: -1, answers: {}, sent: false };
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return Object.assign({ step: -1, answers: {}, sent: false }, JSON.parse(raw));
+  } catch (_) {}
+  return { step: -1, answers: {}, sent: false };
+}
+function newId() { return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2); }
+
+
+let savedTimer;
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const el = document.getElementById('saved');
+    el.classList.add('on');
+    clearTimeout(savedTimer);
+    savedTimer = setTimeout(() => el.classList.remove('on'), 1400);
+  } catch (_) {}
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function numberOf(id) { return Number(id.replace('q', '')); }
+
+function answerText(q) {
+  const a = state.answers[q.id];
+  if (!a) return '';
+  if (q.type === 'text' || q.type === 'textarea') return (a.value || '').trim();
+  const picked = q.type === 'single' ? (a.value ? [a.value] : []) : (a.values || []);
+  const parts = picked.length ? [picked.join(', ')] : [];
+  if (a.extra && a.extra.trim()) parts.push(a.extra.trim());
+  if (a.files && a.files.length) parts.push('Anexos: ' + a.files.map(f => f.name).join(', '));
+  return parts.join('\n');
+}
+
+function answeredCount() {
+  return SECTIONS.flatMap(s => s.questions).filter(q => answerText(q)).length;
+}
+
+function setProgress() {
+  const box = document.getElementById('progress');
+  const inForm = state.step >= 0 && state.step <= SECTIONS.length && !state.sent;
+  box.hidden = !inForm;
+  if (!inForm) return;
+  const done = answeredCount();
+  const pct = Math.round((done / TOTAL_Q) * 100);
+  document.getElementById('progress-label').textContent = state.step < SECTIONS.length ? `Parte ${state.step + 1} de ${SECTIONS.length}` : 'Revisão';
+  document.getElementById('progress-count').textContent = `${done} de ${TOTAL_Q} respondidas`;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-bar').setAttribute('aria-valuenow', pct);
+}
+
+function go(step) {
+  state.step = step;
+  save();
+  render();
+  window.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  const h = app.querySelector('h1, h2');
+  if (h) { h.setAttribute('tabindex', '-1'); h.focus({ preventScroll: true }); }
+}
+
+function render() {
+  setProgress();
+  if (state.sent) return renderDone();
+  if (state.step < 0) return renderIntro();
+  if (state.step >= SECTIONS.length) return renderReview();
+  renderSection(state.step);
+}
+
+const check = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+
+function renderIntro() {
+  const resumed = answeredCount() > 0;
+  app.innerHTML = `<section class="screen">
+    ${META.eyebrow ? `<p class="eyebrow">${esc(META.eyebrow)}</p>` : ''}
+    <h1>${esc(META.greeting)}</h1>
+    ${META.intro ? `<p class="lead">${esc(META.intro)}</p>` : ''}
+    <ul class="facts">
+      <li>${check}<span>São ${TOTAL_Q} perguntas em ${SECTIONS.length} partes curtas. Quase tudo é só marcar. Leva uns ${Math.max(2, Math.round(TOTAL_Q / 3))} minutos.</span></li>
+      <li>${check}<span>As perguntas marcadas como opcionais podem ficar em branco.</span></li>
+      <li>${check}<span>O rascunho fica salvo neste aparelho. Dá para parar e voltar quando quiser.</span></li>
+    </ul>
+    <div class="actions">
+      ${resumed ? '<button class="btn btn-link" id="restart" type="button">Começar do zero</button>' : '<span class="spacer"></span>'}
+      <button class="btn btn-primary" id="start" type="button">${resumed ? 'Continuar de onde parei' : 'Começar'}</button>
+    </div>
+  </section>`;
+  document.getElementById('start').onclick = () => go(resumed ? firstIncompleteStep() : 0);
+  const r = document.getElementById('restart');
+  if (r) r.onclick = () => { state = { step: -1, answers: {}, sent: false, id: newId() }; save(); render(); };
+}
+
+function firstIncompleteStep() {
+  const i = SECTIONS.findIndex(s => missingIn(s).length > 0);
+  return i === -1 ? SECTIONS.length : i;
+}
+
+function fieldHTML(q) {
+  const a = state.answers[q.id] || {};
+  const n = numberOf(q.id);
+  const labelId = `${q.id}-label`;
+  let body = '';
+  if (q.type === 'textarea') {
+    body = `<textarea id="${q.id}" data-q="${q.id}" aria-labelledby="${labelId}" placeholder="Escreva aqui">${esc(a.value || '')}</textarea>`;
+  } else if (q.type === 'text') {
+    body = `<input type="text" id="${q.id}" data-q="${q.id}" aria-labelledby="${labelId}" placeholder="${esc(q.placeholder || 'Escreva aqui')}" value="${esc(a.value || '')}">`;
+  } else if (q.type === 'colors') {
+    const colors = a.values || [];
+    body = `<div class="swatches" role="group" aria-labelledby="${labelId}">` + colors.map((c, i) => `<span class="swatch">
+        <input type="color" data-color="${q.id}" data-i="${i}" value="${esc(c)}" aria-label="Cor ${i + 1}">
+        <span class="swatch-hex" id="${q.id}-hex-${i}">${esc(c.toUpperCase())}</span>
+        <button type="button" class="icon-btn" data-rmcolor="${q.id}" data-i="${i}" aria-label="Remover cor ${i + 1}">×</button>
+      </span>`).join('') + (colors.length < q.max ? `<button type="button" class="add-color" data-addcolor="${q.id}">${colors.length ? 'Adicionar outra cor' : 'Escolher cor'}</button>` : '') + '</div>';
+    body += `<p class="limit-note">${colors.length} de ${q.max} cores</p>`;
+    if (q.extra) body += `<input type="text" class="extra" data-extra="${q.id}" aria-label="${esc(q.extra)}" placeholder="${esc(q.extra)}" value="${esc(a.extra || '')}">`;
+  } else {
+    const isSingle = q.type === 'single';
+    const picked = isSingle ? [a.value] : (a.values || []);
+    const full = q.max && picked.length >= q.max;
+    body = `<div class="chips" role="group" aria-labelledby="${labelId}">` + q.options.map((opt, i) => {
+      const on = picked.includes(opt);
+      return `<label class="chip"><input type="${isSingle ? 'radio' : 'checkbox'}" name="${q.id}" data-opt="${q.id}" value="${esc(opt)}" ${on ? 'checked' : ''} ${!on && full ? 'disabled' : ''}><span>${esc(opt)}</span></label>`;
+    }).join('') + '</div>';
+    if (q.max) body += `<p class="limit-note" id="${q.id}-limit">${picked.length} de ${q.max} escolhidas</p>`;
+    if (q.extra) body += `<input type="text" class="extra" data-extra="${q.id}" aria-label="${esc(q.extra)}" placeholder="${esc(q.extra)}" value="${esc(a.extra || '')}">`;
+  }
+  if (q.files) body += `<div class="files">
+      <label class="file-pick">Anexar arquivos<input type="file" multiple accept="image/*,application/pdf,.ai,.eps" data-file="${q.id}"></label>
+      <ul class="file-list" id="${q.id}-files">${fileItems(q.id)}</ul>
+      <p class="limit-note">Imagens ou PDF, até 4 MB cada.</p>
+      <p class="file-error" id="${q.id}-file-err" role="alert" hidden></p>
+    </div>`;
+  return `<div class="q" data-wrap="${q.id}">
+    <div class="q-label" id="${labelId}"><span class="q-num">${n}.</span><span>${esc(q.label)}</span></div>
+    ${q.hint ? `<p class="q-hint">${esc(q.hint)}</p>` : '<div style="height:8px"></div>'}
+    <div class="q-body">${body}</div>
+    <p class="q-error" id="${q.id}-err" role="alert" hidden>Responda esta pergunta para continuar.</p>
+  </div>`;
+}
+
+const MAX_FILE_BYTES = 4 * 1024 * 1024;
+const uploading = {};
+
+function fmtSize(n) { return n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+
+function fileItems(id) {
+  const files = (state.answers[id] && state.answers[id].files) || [];
+  const busy = uploading[id] || [];
+  return files.map((f, i) => `<li><span class="name">${esc(f.name)}</span><span class="meta">${fmtSize(f.size)}</span><button type="button" class="icon-btn" data-rmfile="${id}" data-i="${i}" aria-label="Remover ${esc(f.name)}">×</button></li>`).join('')
+    + busy.map(name => `<li><span class="name">${esc(name)}</span><span class="meta">Enviando…</span></li>`).join('');
+}
+
+function refreshFiles(id) {
+  const list = document.getElementById(`${id}-files`);
+  if (list) list.innerHTML = fileItems(id);
+}
+
+function fileError(id, msg) {
+  const el = document.getElementById(`${id}-file-err`);
+  if (!el) return;
+  el.textContent = msg || '';
+  el.hidden = !msg;
+}
+
+async function uploadFiles(id, fileList) {
+  fileError(id, '');
+  const a = state.answers[id] = state.answers[id] || {};
+  a.files = a.files || [];
+  for (const file of fileList) {
+    if (file.size > MAX_FILE_BYTES) { fileError(id, `${file.name} passa de 4 MB. Envie uma versão menor ou cole um link.`); continue; }
+    uploading[id] = (uploading[id] || []).concat(file.name);
+    refreshFiles(id);
+    try {
+      const body = new FormData();
+      body.append('file', file);
+      body.append('formId', state.id);
+      body.append('question', id);
+      const res = await fetch('/api/forms/files', { method: 'POST', body });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(out.error || 'Não foi possível enviar o arquivo.');
+      a.files.push({ id: out.id, name: out.name, size: out.size, type: out.type });
+      save(); setProgress(); clearMissing(id);
+    } catch (err) {
+      fileError(id, `${file.name}: ${err.message}`);
+    } finally {
+      uploading[id].splice(uploading[id].indexOf(file.name), 1);
+      refreshFiles(id);
+    }
+  }
+}
+
+async function removeFile(id, i) {
+  const a = state.answers[id];
+  const f = a && a.files && a.files[i];
+  if (!f) return;
+  a.files.splice(i, 1);
+  save(); setProgress(); refreshFiles(id);
+  try { await fetch(`/api/forms/files/${encodeURIComponent(f.id)}?form=${encodeURIComponent(state.id)}`, { method: 'DELETE' }); } catch (_) {}
+}
+
+function renderSection(i) {
+  const s = SECTIONS[i];
+  const last = i === SECTIONS.length - 1;
+  app.innerHTML = `<section class="screen">
+    <p class="eyebrow">Parte ${i + 1} de ${SECTIONS.length}</p>
+    <h2>${esc(s.title)}</h2>
+    <p class="lead">${esc(s.intro)}</p>
+    <form id="form" novalidate>${s.questions.map(fieldHTML).join('')}</form>
+    <div class="actions">
+      <button class="btn btn-ghost" id="back" type="button">Voltar</button>
+      <span class="spacer"></span>
+      <button class="btn btn-primary" id="next" type="button">${last ? 'Revisar respostas' : 'Próxima parte'}</button>
+    </div>
+  </section>`;
+  bindInputs(s);
+  document.getElementById('back').onclick = () => go(i - 1);
+  document.getElementById('next').onclick = () => {
+    const miss = missingIn(s);
+    if (miss.length) return flagMissing(miss);
+    go(i + 1);
+  };
+}
+
+function bindInputs(s) {
+  const form = document.getElementById('form');
+  form.addEventListener('input', e => {
+    const t = e.target;
+    if (t.dataset.color) {
+      const id = t.dataset.color;
+      state.answers[id].values[Number(t.dataset.i)] = t.value;
+      document.getElementById(`${id}-hex-${t.dataset.i}`).textContent = t.value.toUpperCase();
+      save();
+      return;
+    }
+    if (t.dataset.q) {
+      state.answers[t.dataset.q] = Object.assign(state.answers[t.dataset.q] || {}, { value: t.value });
+    } else if (t.dataset.extra) {
+      state.answers[t.dataset.extra] = Object.assign(state.answers[t.dataset.extra] || {}, { extra: t.value });
+    } else return;
+    clearMissing(t.dataset.q || t.dataset.extra);
+    save(); setProgress();
+  });
+  form.addEventListener('click', e => {
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.dataset.addcolor) {
+      const id = t.dataset.addcolor;
+      const a = state.answers[id] = state.answers[id] || {};
+      a.values = (a.values || []).concat(['#C8B8A6']);
+      save(); clearMissing(id); rerenderQuestion(s, id, true);
+    } else if (t.dataset.rmcolor) {
+      const id = t.dataset.rmcolor;
+      state.answers[id].values.splice(Number(t.dataset.i), 1);
+      save(); setProgress(); rerenderQuestion(s, id, false);
+    } else if (t.dataset.rmfile) {
+      removeFile(t.dataset.rmfile, Number(t.dataset.i));
+    }
+  });
+  form.addEventListener('change', e => {
+    const t = e.target;
+    if (t.dataset.file) { uploadFiles(t.dataset.file, [...t.files]); t.value = ''; return; }
+    if (t.dataset.color) { setProgress(); return; }
+    const id = t.dataset.opt;
+    if (!id) return;
+    const q = s.questions.find(x => x.id === id);
+    const a = state.answers[id] = state.answers[id] || {};
+    if (q.type === 'single') {
+      a.value = t.value;
+    } else {
+      const boxes = [...form.querySelectorAll(`input[data-opt="${id}"]`)];
+      a.values = boxes.filter(b => b.checked).map(b => b.value);
+      if (q.max) {
+        const full = a.values.length >= q.max;
+        boxes.forEach(b => { b.disabled = !b.checked && full; });
+        document.getElementById(`${id}-limit`).textContent = `${a.values.length} de ${q.max} escolhidas`;
+      }
+    }
+    clearMissing(id);
+    save(); setProgress();
+  });
+  // Pergunta de escolha única: clicar de novo na opção marcada desmarca.
+  form.querySelectorAll('input[type="radio"]').forEach(r => {
+    r.addEventListener('click', () => {
+      const a = state.answers[r.name];
+      if (r.dataset.wasChecked === '1') {
+        r.checked = false; r.dataset.wasChecked = '0';
+        if (a) a.value = '';
+        save(); setProgress();
+      } else {
+        form.querySelectorAll(`input[name="${r.name}"]`).forEach(o => { o.dataset.wasChecked = '0'; });
+        r.dataset.wasChecked = '1';
+      }
+    });
+    if (r.checked) r.dataset.wasChecked = '1';
+  });
+}
+
+function rerenderQuestion(s, id, openPicker) {
+  const q = s.questions.find(x => x.id === id);
+  const wrap = document.querySelector(`[data-wrap="${id}"]`);
+  const tmp = document.createElement('div');
+  tmp.innerHTML = fieldHTML(q);
+  wrap.replaceWith(tmp.firstElementChild);
+  setProgress();
+  const inputs = document.querySelectorAll(`input[data-color="${id}"]`);
+  if (openPicker && inputs.length) { const last = inputs[inputs.length - 1]; last.focus(); try { last.showPicker(); } catch (_) { last.click(); } }
+  else { const add = document.querySelector(`[data-addcolor="${id}"]`); if (add) add.focus(); }
+}
+
+function missingIn(s) {
+  return s.questions.filter(q => !q.optional && !answerText(q)).map(q => q.id);
+}
+
+function flagMissing(ids) {
+  ids.forEach(id => {
+    document.querySelector(`[data-wrap="${id}"]`).classList.add('invalid');
+    document.getElementById(`${id}-err`).hidden = false;
+  });
+  const first = document.querySelector(`[data-wrap="${ids[0]}"]`);
+  first.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
+  const focusable = first.querySelector('textarea, input');
+  if (focusable) focusable.focus({ preventScroll: true });
+}
+
+function clearMissing(id) {
+  const wrap = document.querySelector(`[data-wrap="${id}"]`);
+  if (!wrap || !wrap.classList.contains('invalid')) return;
+  wrap.classList.remove('invalid');
+  document.getElementById(`${id}-err`).hidden = true;
+}
+
+function asPlainText() {
+  const lines = [META.title, `Respondido em ${new Date().toLocaleString('pt-BR')}`, ''];
+  SECTIONS.forEach(s => {
+    lines.push(s.title.toUpperCase(), '');
+    s.questions.forEach(q => {
+      lines.push(`${numberOf(q.id)}. ${q.label}`, answerText(q) || '(sem resposta)', '');
+    });
+  });
+  return lines.join('\n');
+}
+
+function asJSON() {
+  return {
+    formulario: META.slug,
+    enviado_em: new Date().toISOString(),
+    respostas: SECTIONS.flatMap(s => s.questions.map(q => ({
+      secao: s.title, numero: numberOf(q.id), pergunta: q.label, resposta: answerText(q),
+    }))),
+    anexos: SECTIONS.flatMap(s => s.questions).flatMap(q => ((state.answers[q.id] && state.answers[q.id].files) || []).map(f => ({
+      id: f.id, nome: f.name, tamanho: f.size, tipo: f.type, pergunta: numberOf(q.id),
+    }))),
+  };
+}
+
+function renderReview() {
+  const done = answeredCount();
+  const blocks = SECTIONS.map((s, i) => `<div class="review-section">
+    <h3><span>${esc(s.title)}</span><button type="button" data-edit="${i}">Editar</button></h3>
+    <dl class="review-list">${s.questions.map(q => {
+      const t = answerText(q);
+      return `<dt>${numberOf(q.id)}. ${esc(q.label)}</dt><dd class="${t ? '' : 'empty'}">${t ? esc(t) : 'Sem resposta'}</dd>`;
+    }).join('')}</dl>
+  </div>`).join('');
+
+  const hasEndpoint = !!CONFIG.endpoint;
+  const pendingStep = firstIncompleteStep();
+  let sendButtons = '';
+  if (pendingStep < SECTIONS.length) {
+    sendButtons = `<p class="notice err">Ainda falta responder algumas perguntas.</p><button class="btn btn-primary" id="pending" type="button">Ir para o que falta</button>`;
+  } else if (hasEndpoint) {
+    sendButtons = `<button class="btn btn-brand" id="send" type="button">Enviar respostas</button>`;
+  } else {
+    if (CONFIG.whatsapp) sendButtons += `<button class="btn btn-brand" id="wa" type="button">Enviar pelo WhatsApp</button>`;
+    if (CONFIG.email) sendButtons += `<button class="btn btn-primary" id="mail" type="button">Enviar por e-mail</button>`;
+  }
+  if (pendingStep >= SECTIONS.length) sendButtons += `<button class="btn btn-ghost" id="copy" type="button">Copiar respostas</button>
+    <button class="btn btn-ghost" id="download" type="button">Baixar arquivo</button>`;
+
+  app.innerHTML = `<section class="screen">
+    <p class="eyebrow">Revisão</p>
+    <h2>Confira antes de enviar</h2>
+    <p class="lead">Você respondeu ${done} de ${TOTAL_Q}. ${done < TOTAL_Q ? '' : 'Tudo respondido.'}</p>
+    ${blocks}
+    <div class="review-section">
+      <h3><span>Enviar</span></h3>
+      <div class="send-grid">${sendButtons}</div>
+      <div id="notice" aria-live="polite"></div>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" id="back" type="button">Voltar</button>
+    </div>
+  </section>`;
+
+  app.querySelectorAll('[data-edit]').forEach(b => { b.onclick = () => go(Number(b.dataset.edit)); });
+  document.getElementById('back').onclick = () => go(SECTIONS.length - 1);
+  const pending = document.getElementById('pending');
+  if (pending) { pending.onclick = () => go(pendingStep); return; }
+  document.getElementById('copy').onclick = copyAnswers;
+  document.getElementById('download').onclick = downloadAnswers;
+  const send = document.getElementById('send');
+  if (send) send.onclick = () => sendToEndpoint(send);
+  const wa = document.getElementById('wa');
+  if (wa) wa.onclick = () => {
+    window.open(`https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(asPlainText())}`, '_blank', 'noopener');
+    markSent();
+  };
+  const mail = document.getElementById('mail');
+  if (mail) mail.onclick = () => {
+    location.href = `mailto:${CONFIG.email}?subject=${encodeURIComponent(META.title)}&body=${encodeURIComponent(asPlainText())}`;
+    markSent();
+  };
+}
+
+function notice(msg, kind) {
+  document.getElementById('notice').innerHTML = `<div class="notice ${kind}">${esc(msg)}</div>`;
+}
+
+async function copyAnswers() {
+  try {
+    await navigator.clipboard.writeText(asPlainText());
+    notice('Respostas copiadas. Agora é só colar numa mensagem.', 'ok');
+  } catch (_) {
+    notice('Não deu para copiar neste navegador. Use o botão de baixar arquivo.', 'err');
+  }
+}
+
+function downloadAnswers() {
+  const blob = new Blob([asPlainText()], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${META.slug}.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  notice('Arquivo baixado. Pode mandar por WhatsApp ou e-mail.', 'ok');
+}
+
+async function sendToEndpoint(btn) {
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+  try {
+    const res = await fetch(CONFIG.endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(Object.assign(asJSON(), { id: state.id, texto: asPlainText() })),
+    });
+    if (!res.ok) throw new Error(String(res.status));
+    markSent();
+  } catch (_) {
+    btn.disabled = false;
+    btn.textContent = 'Tentar de novo';
+    notice('Não conseguimos enviar agora. Suas respostas continuam salvas. Tente de novo ou use copiar ou baixar.', 'err');
+  }
+}
+
+function markSent() {
+  state.sent = true;
+  save();
+  render();
+}
+
+function renderDone() {
+  app.innerHTML = `<section class="screen">
+    <div class="done-icon">${check.replace('width="18" height="18"', 'width="26" height="26"')}</div>
+    <h2>${esc(META.thanksTitle)}</h2>
+    <p class="lead">${esc(META.thanksText)}</p>
+    <div class="actions">
+      <button class="btn btn-ghost" id="review" type="button">Ver minhas respostas</button>
+      <span class="spacer"></span>
+      <button class="btn btn-link" id="download" type="button">Baixar uma cópia</button>
+    </div>
+  </section>`;
+  document.getElementById('review').onclick = () => { state.sent = false; go(SECTIONS.length); };
+  document.getElementById('download').onclick = () => {
+    const blob = new Blob([asPlainText()], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = `${META.slug}.txt`;
+    document.body.appendChild(a); a.click(); a.remove();
+  };
+}
+
+// Carrega o formulário publicado; perguntas recebem os ids q1, q2… na ordem em que aparecem.
+async function boot() {
+  try {
+    const res = await fetch(`/api/public-forms/${encodeURIComponent(SLUG)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    META = Object.assign(META, data);
+    let n = 0;
+    SECTIONS = (data.sections || []).map(section => Object.assign({}, section, { questions: section.questions.map(q => Object.assign({}, q, { id: `q${++n}` })) }));
+    TOTAL_Q = n;
+    document.title = META.title;
+    if (/^#[0-9a-f]{6}$/i.test(META.color || '')) {
+      document.documentElement.style.setProperty('--sc-brand', META.color);
+      document.documentElement.style.setProperty('--sc-brand-hover', `color-mix(in srgb, ${META.color} 85%, #000)`);
+      document.documentElement.style.setProperty('--sc-brand-soft', `color-mix(in srgb, ${META.color} 9%, transparent)`);
+    }
+    state = load();
+    if (!state.id) state.id = newId();
+    render();
+  } catch (_) {
+    app.innerHTML = '<section class="screen"><h1>Formulário indisponível</h1><p class="lead">Este link não existe ou não está mais recebendo respostas. Fale com quem enviou o link.</p></section>';
+  }
+}
+boot();
+</script>
+</body>
+</html>

@@ -1,8 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Building2, ChevronDown, Trash2, ImagePlus, LogIn, LogOut, Palette, Pencil, Plus, Stethoscope, UserRound, Users } from 'lucide-react';
+import { Building2, ChevronDown, FileJson, Trash2, ImagePlus, LogIn, LogOut, Palette, Pencil, Plus, Stethoscope, UserRound, Users } from 'lucide-react';
 import { Team } from '@/components/clinic/Team';
+import { FormsAdmin } from '@/components/admin/FormsAdmin';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
@@ -30,6 +31,7 @@ export default function AdminPage() {
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState<ClinicRow | 'new' | null>(null);
   const [open, setOpen] = useState('');
+  const [area, setArea] = useState<'clinicas' | 'formularios'>(() => (typeof window !== 'undefined' && location.hash === '#formularios' ? 'formularios' : 'clinicas'));
 
   const load = useCallback(async () => {
     const response = await fetch('/api/admin/clinics', { cache: 'no-store' });
@@ -65,6 +67,11 @@ export default function AdminPage() {
         <div className="z-brand"><img src="/zaindu-mark.svg" alt="" /><span className="z-brand-name">ZAINDU · Administração</span></div>
         <button type="button" className="z-btn ghost sm" onClick={logout}><LogOut />Sair</button>
       </header>
+      <div className="z-tabs" role="tablist" aria-label="Áreas da administração">
+        <button type="button" role="tab" aria-selected={area === 'clinicas'} onClick={() => setArea('clinicas')}><Building2 aria-hidden="true" />Clínicas</button>
+        <button type="button" role="tab" aria-selected={area === 'formularios'} onClick={() => setArea('formularios')}><FileJson aria-hidden="true" />Formulários</button>
+      </div>
+      {area === 'formularios' ? <FormsAdmin /> : <>
       <header className="z-pagehead">
         <div>
           <h1 className="t-display">Clínicas</h1>
@@ -109,6 +116,7 @@ export default function AdminPage() {
           }}
         />
       )}
+      </>}
       {notice && <Toast tone="success" message={notice} onClose={() => setNotice('')} />}
     </main>
   );

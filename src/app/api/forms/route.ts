@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/mongodb';
+import { forms, LEGACY_FORMS } from '@/lib/forms';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,12 @@ export async function POST(request: NextRequest) {
     return { id: String(file.id || '').slice(0, 24), nome: String(file.nome || '').slice(0, 180), tamanho: Number(file.tamanho) || 0, tipo: String(file.tipo || '').slice(0, 80), pergunta: Number(file.pergunta) || 0 };
   }).filter(file => /^[a-f\d]{24}$/i.test(file.id));
   const enviadoEm = new Date(String(body.enviado_em || ''));
+
+  // Só aceita respostas do questionário fixo (/forms) ou de um formulário publicado no admin.
+  if (!LEGACY_FORMS.some(item => item.slug === formulario)) {
+    const form = await forms(await getDatabase()).findOne({ _id: formulario, status: 'publicado' }, { projection: { _id: 1 } }).catch(() => null);
+    if (!form) return NextResponse.json({ error: 'Este formulário não está recebendo respostas.' }, { status: 403 });
+  }
 
   try {
     const database = await getDatabase();

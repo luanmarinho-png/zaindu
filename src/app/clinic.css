@@ -659,3 +659,24 @@ a.z-close { color: var(--sc-ink-muted); }
   .z-visit-body { padding: 4px 10px 12px; }
   .z-remember dl { grid-template-columns: 1fr 1fr; }
 }
+/* Admin: formulários e respostas */
+.z-form-editor { display: grid; gap: 16px; }
+.z-question-flags { display: flex; flex-wrap: wrap; gap: 18px; }
+.z-answers { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; align-items: start; }
+.z-answers-list { position: sticky; top: 0; display: grid; gap: 6px; max-height: 70vh; overflow-y: auto; }
+.z-answers-list button { display: grid; gap: 2px; padding: 10px 12px; border: 0; border-radius: 12px; background: var(--sc-card); box-shadow: var(--sc-shadow-100); text-align: left; font: inherit; color: var(--sc-ink); cursor: pointer; }
+.z-answers-list button strong { font-size: 13px; font-weight: 600; }
+.z-answers-list button small { font-size: 11px; }
+.z-answers-list button[aria-current='true'] { background: var(--sc-brand-soft); box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--sc-brand) 40%, transparent); }
+.z-answer { display: grid; gap: 14px; padding: 16px; border-radius: var(--sc-radius-field); background: var(--sc-card); box-shadow: var(--sc-shadow-100); }
+.z-answer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.z-answer-head small { font-size: 11px; }
+.z-answer-files { display: flex; flex-wrap: wrap; gap: 8px; }
+.z-answer-files a { text-decoration: none; color: var(--sc-ink); }
+.z-answer-files svg { width: 12px; height: 12px; }
+.z-answer-section h4 { margin: 0 0 8px; font: 600 12px var(--sc-font); letter-spacing: .04em; text-transform: uppercase; color: color-mix(in srgb, var(--sc-brand) 85%, #000); }
+.z-answer-section dl { display: grid; gap: 10px; margin: 0; }
+.z-answer-section dt { font-size: 12px; color: var(--sc-ink-muted); }
+.z-answer-section dd { margin: 2px 0 0; font-size: 14px; white-space: pre-wrap; }
+.z-admin > .z-tabs { justify-self: start; }
+@media (max-width: 720px) { .z-answers { grid-template-columns: 1fr; } .z-answers-list { position: static; max-height: none; grid-auto-flow: column; grid-auto-columns: 70%; overflow-x: auto; } }
