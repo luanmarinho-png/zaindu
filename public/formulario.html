@@ -215,6 +215,8 @@ textarea:focus, input[type="text"]:focus { outline: none; border-color: var(--sc
   .actions .spacer { display: none; }
   .btn { width: 100%; }
 }
+.preview-bar { position: sticky; top: 0; z-index: 50; padding: 8px 16px; background: #1c1d20; color: #fff; font: 600 12px/1.4 Inter, sans-serif; text-align: center; letter-spacing: .02em; }
+.notice-float { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 60; max-width: 520px; margin: 0 auto; }
 </style>
 </head>
 <body>
@@ -246,7 +248,9 @@ const SLUG = decodeURIComponent(location.pathname.split('/').filter(Boolean).pop
 let META = { slug: SLUG, title: 'Formulário', eyebrow: '', greeting: 'Olá', intro: '', thanksTitle: 'Obrigado', thanksText: 'Recebemos suas respostas.', color: '' };
 let SECTIONS = [];
 let TOTAL_Q = 0;
-let STORAGE_KEY = `formulario-${SLUG}-v1`;
+// ?previa=1: o admin vê o formulário como o cliente, mesmo em rascunho; nada é enviado nem anexado.
+const PREVIEW = new URLSearchParams(location.search).has('previa');
+let STORAGE_KEY = `formulario-${SLUG}-v1${PREVIEW ? '-previa' : ''}`;
 const app = document.getElementById('app');
 let state = { step: -1, answers: {}, sent: false };
 
@@ -418,6 +422,7 @@ function fileError(id, msg) {
 }
 
 async function uploadFiles(id, fileList) {
+  if (PREVIEW) { notice('Pré-visualização: anexos não são enviados.', 'ok'); return; }
   fileError(id, '');
   const a = state.answers[id] = state.answers[id] || {};
   a.files = a.files || [];
@@ -668,7 +673,10 @@ function renderReview() {
 }
 
 function notice(msg, kind) {
-  document.getElementById('notice').innerHTML = `<div class="notice ${kind}">${esc(msg)}</div>`;
+  let el = document.getElementById('notice');
+  // Fora da revisão não há área de aviso: mostra um aviso flutuante.
+  if (!el) { el = document.createElement('div'); el.id = 'notice'; el.className = 'notice-float'; document.body.appendChild(el); setTimeout(() => el.remove(), 3500); }
+  el.innerHTML = `<div class="notice ${kind}">${esc(msg)}</div>`;
 }
 
 async function copyAnswers() {
@@ -691,6 +699,7 @@ function downloadAnswers() {
 }
 
 async function sendToEndpoint(btn) {
+  if (PREVIEW) { notice('Pré-visualização: as respostas não são enviadas. É assim que o cliente vê o envio.', 'ok'); markSent(); return; }
   btn.disabled = true;
   btn.textContent = 'Enviando...';
   try {
@@ -737,7 +746,7 @@ function renderDone() {
 // Carrega o formulário publicado; perguntas recebem os ids q1, q2… na ordem em que aparecem.
 async function boot() {
   try {
-    const res = await fetch(`/api/public-forms/${encodeURIComponent(SLUG)}`, { cache: 'no-store' });
+    const res = await fetch(`/api/public-forms/${encodeURIComponent(SLUG)}${PREVIEW ? '?previa=1' : ''}`, { cache: 'no-store' });
     if (!res.ok) throw new Error();
     const data = await res.json();
     META = Object.assign(META, data);
@@ -752,6 +761,12 @@ async function boot() {
     }
     state = load();
     if (!state.id) state.id = newId();
+    if (PREVIEW) {
+      const bar = document.createElement('div');
+      bar.className = 'preview-bar';
+      bar.textContent = `Pré-visualização${data.status && data.status !== 'publicado' ? ' de rascunho' : ''} · nada é enviado`;
+      document.body.prepend(bar);
+    }
     render();
   } catch (_) {
     app.innerHTML = '<section class="screen"><h1>Formulário indisponível</h1><p class="lead">Este link não existe ou não está mais recebendo respostas. Fale com quem enviou o link.</p></section>';

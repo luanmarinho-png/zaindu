@@ -680,3 +680,4 @@ a.z-close { color: var(--sc-ink-muted); }
 .z-answer-section dd { margin: 2px 0 0; font-size: 14px; white-space: pre-wrap; }
 .z-admin > .z-tabs { justify-self: start; }
 @media (max-width: 720px) { .z-answers { grid-template-columns: 1fr; } .z-answers-list { position: static; max-height: none; grid-auto-flow: column; grid-auto-columns: 70%; overflow-x: auto; } }
+.z-save-state { font-size: 12px; }

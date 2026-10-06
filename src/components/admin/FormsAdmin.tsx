@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight, Copy, Download, ExternalLink, FileJson, Inbox, Link2, Palette, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
@@ -65,7 +65,7 @@ export function FormsAdmin() {
                 <span className={`z-badge sm ${STATUS_TONE[row.status]}`}>{row.legacy ? 'Página fixa' : STATUS_LABEL[row.status]}</span>
                 <div className="z-row-actions">
                   <button type="button" className="z-close" onClick={() => copyLink(row)} aria-label="Copiar link" title="Copiar link"><Link2 /></button>
-                  <a className="z-close" href={row.url} target="_blank" rel="noopener noreferrer" aria-label="Abrir formulário" title="Abrir"><ExternalLink /></a>
+                  <a className="z-close" href={row.legacy || row.status === 'publicado' ? row.url : `${row.url}?previa=1`} target="_blank" rel="noopener noreferrer" aria-label="Abrir formulário" title={row.legacy || row.status === 'publicado' ? 'Abrir' : 'Pré-visualizar (rascunho)'}><ExternalLink /></a>
                   {!row.legacy && <button type="button" className="z-close" onClick={() => setEditing(row.slug)} aria-label={`Editar ${row.title}`} title="Editar"><Pencil /></button>}
                   <button type="button" className="z-btn secondary sm" onClick={() => setAnswers(row)}><Inbox />Respostas</button>
                 </div>
@@ -130,20 +130,23 @@ function FormEditor({ slug, onClose, onChanged, onDeleted }: { slug: string; onC
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState('');
   useEffect(() => { api<{ form: FullForm }>(`/api/admin/forms/${slug}`).then(result => setForm(result.form)).catch(err => setError(err.message)); }, [slug]);
-  const set = (patch: Partial<FullForm>) => { setForm(current => current && { ...current, ...patch }); setDirty(true); };
+  const edits = useRef(0);
+  const set = (patch: Partial<FullForm>) => { edits.current += 1; setForm(current => current && { ...current, ...patch }); setDirty(true); };
   const setSection = (index: number, patch: Partial<FormSection>) => form && set({ sections: form.sections.map((section, i) => i === index ? { ...section, ...patch } : section) });
   const setQuestion = (s: number, q: number, patch: Partial<FormQuestion>) => form && setSection(s, { questions: form.sections[s].questions.map((question, i) => i === q ? { ...question, ...patch } : question) });
 
-  async function save(status?: FormStatus) {
+  async function save(status?: FormStatus, quiet = false) {
     if (!form) return;
     setBusy(true);
     setError('');
+    const version = edits.current;
     try {
       const { slug: _slug, ...fields } = form;
       await api(`/api/admin/forms/${slug}`, { method: 'PATCH', body: JSON.stringify({ ...fields, ...(status ? { status } : {}) }) });
       if (status) setForm(current => current && { ...current, status });
-      setDirty(false);
-      onChanged(status === 'publicado' ? 'Formulário publicado. Já pode enviar o link.' : 'Formulário salvo.');
+      // Só marca como salvo se ninguém editou durante o envio.
+      if (version === edits.current) setDirty(false);
+      if (!quiet) onChanged(status === 'publicado' ? 'Formulário publicado. Já pode enviar o link.' : status === 'encerrado' ? 'Formulário encerrado.' : 'Formulário salvo.');
     } catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível salvar.'); }
     finally { setBusy(false); }
   }
@@ -152,15 +155,30 @@ function FormEditor({ slug, onClose, onChanged, onDeleted }: { slug: string; onC
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível apagar.'); }
   }
 
+  // Salvamento automático 1,5 s depois da última edição; o botão salva na hora.
+  useEffect(() => {
+    if (!dirty || busy) return;
+    const timer = setTimeout(() => { save(undefined, true); }, 1500);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, dirty]);
+  // Pré-visualização abre já com o que está na tela (salva antes) e funciona mesmo em rascunho.
+  async function preview() {
+    const tab = window.open('about:blank', '_blank');
+    if (dirty) await save(undefined, true);
+    if (tab) tab.location.href = `/formulario/${slug}?previa=1`;
+  }
+
   const total = form?.sections.reduce((sum, section) => sum + section.questions.length, 0) || 0;
   return (
     <Modal size="lg" variant="drawer" title={form ? form.title : 'Formulário'} description={form ? `/formulario/${slug} · ${STATUS_LABEL[form.status]} · ${total} perguntas` : ''} onClose={onClose}
       footer={form && <>
-        <a className="z-btn ghost" href={`/formulario/${slug}`} target="_blank" rel="noopener noreferrer"><ExternalLink />Ver como cliente</a>
+        <button type="button" className="z-btn ghost" onClick={preview}><ExternalLink />Pré-visualizar</button>
         <span className="spacer" />
         {form.status !== 'publicado' ? <button type="button" className="z-btn secondary" disabled={busy} onClick={() => save('publicado')}>Salvar e publicar</button>
           : <button type="button" className="z-btn secondary" disabled={busy} onClick={() => save('encerrado')}>Encerrar</button>}
-        <button type="button" className="z-btn brand" disabled={busy || !dirty} onClick={() => save()}><Save />{busy ? 'Salvando…' : dirty ? 'Salvar' : 'Salvo'}</button>
+        <span className="z-save-state t-muted" aria-live="polite">{busy ? 'Salvando…' : dirty ? 'Alterações não salvas' : 'Tudo salvo'}</span>
+        <button type="button" className="z-btn brand" disabled={busy} onClick={() => save()}><Save />Salvar</button>
       </>}>
       {error && <p className="z-callout danger" role="alert">{error}</p>}
       {!form ? <span className="z-loader" aria-hidden="true" /> : <div className="z-form-editor">
