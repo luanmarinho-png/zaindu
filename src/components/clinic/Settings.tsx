@@ -365,6 +365,11 @@ function Letterhead({ data, setData, brand }: ClinicProps & { brand: Brand | nul
           </button>
         ))}
       </div>
+      <label className="z-switch z-module">
+        <input type="checkbox" checked={data.settings.letterheadWatermark !== false} onChange={event => set({ letterheadWatermark: event.target.checked })} />
+        <span className="track" aria-hidden="true" />
+        <span><strong>Marca d’água com o logo</strong><small className="t-muted">Logo bem claro ao fundo do documento</small></span>
+      </label>
       <div className="z-form-grid">
         {contact('clinicPhone', 'Telefone / WhatsApp', Phone, '(11) 99999-0000')}
         {contact('clinicEmail', 'E-mail', Mail, 'contato@clinica.com.br')}

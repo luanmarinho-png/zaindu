@@ -550,3 +550,21 @@ a.z-close { color: var(--sc-ink-muted); }
 .z-letterhead-paper iframe { position: absolute; top: 0; left: 0; width: 794px; height: 1123px; border: 0; transform-origin: 0 0; pointer-events: none; }
 .z-letterhead { align-content: start; }
 @media (max-width: 720px) { .z-letterheads { grid-template-columns: 1fr 1fr; gap: 10px; } .z-letterhead small { display: none; } }
+/* Agenda: calendário maior + coluna com o dia escolhido e os próximos 7 dias */
+.z-agenda { grid-template-columns: minmax(0, 1fr) 360px; }
+.z-cal-day { min-height: 136px; }
+.z-agenda-side { position: sticky; top: 20px; display: grid; gap: 16px; align-content: start; }
+.z-agenda-side .z-dayview { position: static; }
+.z-week { display: grid; gap: 12px; padding: 20px; }
+.z-week > header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.z-week > header span { font-size: 12px; }
+.z-week-day { display: grid; gap: 6px; }
+.z-week-date { display: flex; align-items: center; justify-content: space-between; padding: 0; border: 0; background: none; font: 600 12px var(--sc-font); color: var(--sc-ink-muted); text-transform: none; cursor: pointer; }
+.z-week-date small { min-width: 20px; padding: 1px 7px; border-radius: 999px; background: var(--sc-brand-soft); color: color-mix(in srgb, var(--sc-brand) 85%, #000); font-size: 11px; text-align: center; }
+.z-week-day ul { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.z-week-day li button { display: grid; grid-template-columns: 44px minmax(0, 1fr); column-gap: 8px; width: 100%; padding: 7px 10px; border: 0; border-radius: 10px; background: var(--sc-surface); text-align: left; font: inherit; color: var(--sc-ink); cursor: pointer; transition: background var(--sc-fast) var(--sc-ease); }
+.z-week-day li button:hover { background: var(--sc-brand-soft); }
+.z-week-day li b { grid-row: span 2; font-size: 13px; font-weight: 600; }
+.z-week-day li span { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.z-week-day li small { font-size: 11px; color: var(--sc-ink-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 1100px) { .z-agenda { grid-template-columns: 1fr; } .z-agenda-side { position: static; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); } }

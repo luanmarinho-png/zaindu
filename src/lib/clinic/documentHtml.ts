@@ -50,6 +50,8 @@ export function documentHtml(document: ClinicalDocument, patient: Patient, setti
   const initial = escape((settings.clinicName || 'C').slice(0, 1).toUpperCase());
   const logo = brand?.logo ? `<img src="${brand.logo}" alt="" class="logo">` : `<span class="logo mark">${initial}</span>`;
   const bigLogo = brand?.logo ? `<img src="${brand.logo}" alt="">` : `<span class="mark">${initial}</span>`;
+  // Marca d'água opcional (Configurações → Papel timbrado).
+  const mark = (place: string) => settings.letterheadWatermark === false ? '' : `<div class="watermark ${place}">${bigLogo}</div>`;
   const signer = professional || { name: settings.professionalName, registry: settings.professionalRegistry, specialty: settings.specialty };
   const contacts = ([['phone', settings.clinicPhone], ['mail', settings.clinicEmail], ['insta', settings.clinicInstagram], ['web', settings.clinicWebsite], ['pin', settings.clinicAddress]] as [string, string | undefined][])
     .filter(([, value]) => value?.trim()).map(([name, value]) => `<span>${icon(name)}<em>${escape(String(value))}</em></span>`).join('');
@@ -61,7 +63,7 @@ export function documentHtml(document: ClinicalDocument, patient: Patient, setti
       head: 38, foot: 22,
       deco: `<div class="fixed top">${brandBlock}<div class="rule"></div></div>
         <div class="fixed bottom contacts">${contacts}</div>
-        <div class="watermark corner">${bigLogo}</div>`,
+        ${mark("corner")}`,
       css: `.top { top: 14mm; left: 20mm; right: 20mm; } .rule { height: 2px; margin-top: 12px; background: ${color}; }
         .bottom { bottom: 10mm; left: 20mm; right: 20mm; } .corner { right: 12mm; bottom: 18mm; width: 60mm; height: 60mm; }`,
     },
@@ -76,16 +78,18 @@ export function documentHtml(document: ClinicalDocument, patient: Patient, setti
       css: `.top { top: 32mm; left: 20mm; } .bottom { bottom: 10mm; left: 20mm; max-width: 120mm; }`,
     },
     onda: {
-      head: 46, foot: 30,
+      head: 46, foot: 38,
       deco: `<svg class="fixed page" viewBox="0 0 210 297" preserveAspectRatio="none" aria-hidden="true">
           <path d="M0,0 H210 V20 C168,34 104,12 0,32 Z" fill="${color}"/>
           <path d="M96,30 C140,22 178,30 210,22" fill="none" stroke="${accent}" stroke-width="1.4"/>
-          <rect x="0" y="279" width="210" height="1.6" fill="${accent}"/><rect x="0" y="281.6" width="210" height="15.4" fill="${color}"/>
+          <path d="M0,276 C70,268 140,284 210,272 V297 H0 Z" fill="${color}"/>
+          <path d="M0,271 C60,264 120,276 170,268" fill="none" stroke="${accent}" stroke-width="1.2"/>
         </svg>
         <div class="fixed top">${brandWhite}</div>
-        <div class="watermark center">${bigLogo}</div>
+        ${mark("center")}
         <div class="fixed bottom contacts on-color">${contacts}</div>`,
-      css: `.top { top: 7mm; left: 18mm; } .bottom { bottom: 4.5mm; left: 18mm; right: 18mm; justify-content: center; }
+      css: `.top { top: 7mm; left: 18mm; } .bottom { bottom: 6mm; left: 18mm; right: 18mm; justify-content: center; gap: 2mm 7mm; font-size: 8.5pt; letter-spacing: .01em; }
+        .bottom span:last-child:nth-child(n+4) { flex-basis: 100%; justify-content: center; opacity: .85; }
         .center { left: 50%; top: 50%; width: 120mm; height: 120mm; transform: translate(-50%, -50%); }`,
     },
     linhas: {
@@ -94,7 +98,7 @@ export function documentHtml(document: ClinicalDocument, patient: Patient, setti
           <rect x="44" y="0" width="56" height="2.6" fill="${color}"/>
           <rect x="0" y="290" width="152" height="7" fill="${color}"/><rect x="152" y="290" width="58" height="7" fill="${accent}"/>
         </svg>
-        <div class="watermark hero">${bigLogo}</div>
+        ${mark("hero")}
         <div class="fixed top">${brandBlock}</div>
         <div class="fixed side contacts stacked right">${contacts}</div>`,
       css: `.top { top: 16mm; left: 20mm; } .side { top: 14mm; right: 20mm; max-width: 70mm; }

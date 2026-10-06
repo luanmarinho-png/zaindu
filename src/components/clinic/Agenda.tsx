@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { CalendarPlus, Clock, Plus } from 'lucide-react';
+import { CalendarDays, CalendarPlus, Clock, Plus } from 'lucide-react';
 import { brl, capitalize, formatDate } from '@/lib/clinic/format';
 import { MAIN_PROFESSIONAL, type Professional } from '@/lib/clinic/permissions';
 import { dayKey, monthKey, type Appointment, type Store } from '@/lib/clinic/store';
@@ -49,6 +49,12 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
   }, [data.appointments, professionalFilter]);
   const patientName = (id: string) => data.patients.find(patient => patient.id === id)?.name || 'Paciente removido';
   const dayList = byDay.get(selectedDate) || [];
+  // Próximos 7 dias a partir de hoje (sem as canceladas), agrupados por dia.
+  const week = Array.from({ length: 7 }, (_, offset) => {
+    const date = dayKey(new Date(Date.now() + offset * 864e5));
+    const label = offset === 0 ? 'Hoje' : offset === 1 ? 'Amanhã' : capitalize(formatDate(date, { weekday: 'long', day: '2-digit', month: '2-digit' }));
+    return { date, label, items: (byDay.get(date) || []).filter(item => item.status !== 'Cancelada') };
+  });
   const dayRevenue = dayList.filter(item => item.status !== 'Cancelada').reduce((sum, item) => sum + item.price, 0);
 
   const changeMonth = (next: string) => {
@@ -94,12 +100,12 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
                     <button type="button" className="z-cal-add" onClick={event => { event.stopPropagation(); onNew(key); }} aria-label={`Agendar em ${formatDate(key)}`}><Plus /></button>
                   </div>
                   <div className="z-cal-events">
-                    {entries.slice(0, 3).map(item => (
+                    {entries.slice(0, 4).map(item => (
                       <button key={item.id} type="button" className={`z-cal-event status-${item.status.toLowerCase()}`} onClick={event => { event.stopPropagation(); onOpen(item); }} title={`${item.time} · ${patientName(item.patientId)} · ${item.type}`}>
                         <b className="num">{item.time}</b> {patientName(item.patientId).split(' ')[0]}
                       </button>
                     ))}
-                    {entries.length > 3 && <span className="z-cal-more">+{entries.length - 3}</span>}
+                    {entries.length > 4 && <span className="z-cal-more">+{entries.length - 4}</span>}
                   </div>
                   {active.length > 0 && <span className="z-cal-dots" aria-hidden="true">{active.slice(0, 4).map(item => <i key={item.id} className={`status-${item.status.toLowerCase()}`} />)}</span>}
                 </div>
@@ -111,7 +117,8 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
           </div>
         </section>
 
-        <aside className="z-card z-dayview" aria-live="polite">
+        <div className="z-agenda-side">
+        <aside className="z-card white z-dayview" aria-live="polite">
           <header className="z-dayview-head">
             <div>
               <h2 className="t-h1">{capitalize(formatDate(selectedDate, { weekday: 'long', day: 'numeric', month: 'long' }))}</h2>
@@ -135,6 +142,20 @@ export function Agenda({ data, month, onMonthChange, selectedDate, onSelectDate,
           )}
           <button type="button" className="z-btn secondary block" onClick={() => onNew(selectedDate)}><Plus />Agendar neste dia</button>
         </aside>
+        <section className="z-card white z-week" aria-label="Consultas dos próximos 7 dias">
+          <header><h2 className="t-h2"><CalendarDays aria-hidden="true" className="z-inline-icon" />Próximos 7 dias</h2><span className="t-muted num">{week.reduce((sum, day) => sum + day.items.length, 0)} consulta(s)</span></header>
+          {week.some(day => day.items.length) ? week.filter(day => day.items.length).map(day => (
+            <div key={day.date} className="z-week-day">
+              <button type="button" className="z-week-date" onClick={() => onSelectDate(day.date)}>{day.label}<small className="num">{day.items.length}</small></button>
+              <ul>
+                {day.items.map(item => (
+                  <li key={item.id}><button type="button" onClick={() => onOpen(item)}><b className="num">{item.time}</b><span>{patientName(item.patientId)}</span><small>{item.type}</small></button></li>
+                ))}
+              </ul>
+            </div>
+          )) : <div className="z-empty"><span>Nenhuma consulta nos próximos 7 dias.</span></div>}
+        </section>
+        </div>
       </div>
     </>
   );

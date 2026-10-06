@@ -20,7 +20,7 @@ export type ClinicalNote = { id: string; patientId: string; appointmentId: strin
 export type MediaAttachment = { id: string; patientId: string; appointmentId: string; kind: 'patient' | 'before' | 'after' | 'trichoscopy'; caption: string; capturedAt: string; mimeType: string; sizeBytes: number; storageKey: string; createdAt: string };
 export type ClinicSettings = { clinicName: string; professionalName: string; specialty: string; professionalRegistry: string; showDailyVerse?: boolean;
   // Papel timbrado e contatos que saem no rodapé dos documentos.
-  letterhead?: string; clinicPhone?: string; clinicEmail?: string; clinicAddress?: string; clinicWebsite?: string; clinicInstagram?: string; appointmentTypes: string[]; trichoscopyFindings: string[]; record: RecordConfig };
+  letterhead?: string; letterheadWatermark?: boolean; clinicPhone?: string; clinicEmail?: string; clinicAddress?: string; clinicWebsite?: string; clinicInstagram?: string; appointmentTypes: string[]; trichoscopyFindings: string[]; record: RecordConfig };
 export type Supply = { id:string; name:string; category:string; unit:string; unitCost:number; defaultQty:number };
 export type ServiceItem = { supplyId: string; qty: number };
 // price 0 = usa o preço sugerido (custo + margem). duration em minutos, usada ao agendar.
