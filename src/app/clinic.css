@@ -621,3 +621,41 @@ a.z-close { color: var(--sc-ink-muted); }
   .z-patient-actions .z-close { width: 40px; height: 40px; border-radius: 12px; background: var(--sc-card); box-shadow: var(--sc-shadow-100); }
   .z-patient-actions .z-btn { justify-self: end; min-height: 40px; }
 }
+/* Prontuário em abas: resumo, anamnese, evoluções, fotos e documentos */
+.z-record-tabs { position: sticky; top: 12px; z-index: 5; }
+.z-record-tabs small { min-width: 18px; padding: 0 6px; border-radius: 999px; background: var(--sc-soft); color: var(--sc-ink-muted); font: 600 10px/16px var(--sc-font); text-align: center; }
+.z-record-glance { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.z-glance { display: grid; gap: 2px; margin: 0; font-size: 14px; }
+.z-glance b { font-weight: 600; }
+.z-record-group { border-top: 1px solid var(--sc-border); }
+.z-record-group:first-of-type { border-top: 0; }
+.z-record-group > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; list-style: none; }
+.z-record-group > summary::-webkit-details-marker { display: none; }
+.z-record-group > summary::after { content: ''; width: 8px; height: 8px; margin-left: auto; border-right: 1.5px solid var(--sc-ink-muted); border-bottom: 1.5px solid var(--sc-ink-muted); transform: rotate(45deg); transition: transform var(--sc-base) var(--sc-ease); }
+.z-record-group[open] > summary::after { transform: rotate(-135deg); }
+.z-record-group > .z-deflist { padding-bottom: 14px; }
+.z-visits { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.z-visit { border-radius: var(--sc-radius-field); background: var(--sc-surface); box-shadow: var(--sc-inner-100); }
+.z-visit > summary { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; list-style: none; }
+.z-visit > summary::-webkit-details-marker { display: none; }
+.z-visit-date { display: grid; justify-items: center; min-width: 46px; padding: 4px 0; border-radius: 10px; background: var(--sc-card); box-shadow: var(--sc-shadow-100); }
+.z-visit-date b { font-size: 13px; font-weight: 600; }
+.z-visit-date small { font-size: 10px; color: var(--sc-ink-muted); }
+.z-visit-main { flex: 1; display: grid; gap: 1px; min-width: 0; }
+.z-visit-main strong { font-size: 13.5px; font-weight: 600; }
+.z-visit-main small { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.z-visit[open] .z-visit-main small { white-space: normal; }
+.z-visit-body { display: grid; gap: 10px; padding: 4px 14px 14px; border-top: 1px solid var(--sc-border); }
+.z-visit-body > .z-btn { justify-self: start; }
+@media (max-width: 720px) {
+  .z-record-tabs { top: 64px; margin: 0 -4px; }
+  .z-alerts { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .z-alerts .z-alert { padding: 10px 12px; }
+  .z-alerts .z-alert p { font-size: 13px; }
+  .z-record-summary { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; }
+  .z-record-summary .z-row-actions { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; }
+  .z-record-summary .z-row-actions .z-btn { width: 100%; }
+  .z-visit > summary { padding: 10px; gap: 10px; }
+  .z-visit-body { padding: 4px 10px 12px; }
+  .z-remember dl { grid-template-columns: 1fr 1fr; }
+}

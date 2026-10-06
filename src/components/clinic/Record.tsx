@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Camera, CalendarPlus, ClipboardList, Columns2, FilePlus2, FileText, HeartPulse, ImagePlus, MessageCircleHeart, Pill, Printer, Trash2, TriangleAlert, UserPen } from 'lucide-react';
+import { Camera, CalendarPlus, ClipboardList, LayoutGrid, NotebookPen, Columns2, FilePlus2, FileText, HeartPulse, ImagePlus, MessageCircleHeart, Pill, Printer, Trash2, TriangleAlert, UserPen } from 'lucide-react';
 import { MAIN_PROFESSIONAL, type Access, type Brand, type Professional } from '@/lib/clinic/permissions';
 import { DocumentModal, printDocument } from './Documents';
 import { Modal } from '@/components/ui/Modal';
@@ -15,6 +15,9 @@ import type { ClinicProps } from './types';
 import { Select } from '@/components/ui/Select';
 
 // A categoria "trichoscopy" guarda o exame com aumento de cada especialidade.
+type RecordTab = 'resumo' | 'anamnese' | 'evolucoes' | 'fotos' | 'documentos';
+const RECORD_TABS: [RecordTab, string, typeof Camera][] = [['resumo', 'Resumo', LayoutGrid], ['anamnese', 'Anamnese', ClipboardList], ['evolucoes', 'Evoluções', NotebookPen], ['fotos', 'Fotos', Camera], ['documentos', 'Documentos', FileText]];
+
 const SCOPE_LABEL: Record<TemplateId, string> = { tricologia: 'Tricoscopia', dermatologia: 'Dermatoscopia', geral: 'Exame' };
 const mediaKinds = (template: TemplateId): Record<MediaAttachment['kind'], string> => ({ patient: 'Paciente', before: 'Antes', after: 'Depois', trichoscopy: SCOPE_LABEL[template] });
 
@@ -35,6 +38,10 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
   const [mediaModal, setMediaModal] = useState(false);
   const [documentModal, setDocumentModal] = useState<{ document?: ClinicalDocument } | null>(null);
   const [compare, setCompare] = useState(false);
+  const [tab, setTab] = useState<RecordTab>('resumo');
+  const [visible, setVisible] = useState(12);
+  // No celular a anamnese abre só a primeira categoria; no computador, todas.
+  const compact = typeof window !== 'undefined' && window.innerWidth <= 720;
   const patient = data.patients.find(item => item.id === patientId);
   const profile = data.profiles[patientId] || emptyProfile;
   const notes = data.notes.filter(note => note.patientId === patientId).sort((a, b) => b.date.localeCompare(a.date));
@@ -45,6 +52,15 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
   const record = data.settings.record;
   const anamnesis = record.anamnesis.filter(field => hasValue(profile[field.key]));
   const MEDIA_KIND = mediaKinds(record.template);
+  const allFields = record.sections.flatMap(section => section.fields);
+  // Consultas e evoluções numa só linha do tempo (evolução sem consulta entra como anotação geral).
+  const timeline = [
+    ...appointments.map(item => ({ key: item.id, date: item.date, time: item.time, appointment: item, note: notes.find(entry => entry.appointmentId === item.id) })),
+    ...notes.filter(note => !note.appointmentId || !appointments.some(item => item.id === note.appointmentId)).map(note => ({ key: note.id, date: note.date, time: '', appointment: undefined, note })),
+  ].sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`));
+  const today = new Date().toISOString().slice(0, 10);
+  const nextVisit = appointments.filter(item => item.status === 'Agendada' && item.date >= today).sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))[0];
+  const lastNote = notes[0];
   const documents = (data.documents || []).filter(item => item.patientId === patientId).sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
   const proName = (id: string) => professionals.find(item => item.id === (id || MAIN_PROFESSIONAL))?.name || data.settings.professionalName;
   const print = (item: ClinicalDocument) => {
@@ -94,117 +110,146 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
       </section>
 
       {patient && <>
-        <Remember patient={patient} />
-        <div className="z-alerts">
-          <Alert icon={TriangleAlert} label="Alergias" value={profile.allergies || ''} empty="Não informado, confirmar" warn={Boolean(profile.allergies)} />
-          <Alert icon={HeartPulse} label="Comorbidades" value={profile.comorbidities || ''} empty="Não informado" />
-          <Alert icon={Pill} label="Medicamentos em uso" value={profile.medications || ''} empty="Não informado" />
-          <Alert icon={MessageCircleHeart} label="Como prefere conversar" value={profile.communicationStyle || ''} empty="Não informado" />
+        <div className="z-tabs z-record-tabs" role="tablist" aria-label="Partes do prontuário">
+          {RECORD_TABS.map(([id, label, Icon]) => (
+            <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+              <Icon aria-hidden="true" />{label}{id === 'evolucoes' && <small className="num">{timeline.length}</small>}{id === 'fotos' && media.length > 0 && <small className="num">{media.length}</small>}{id === 'documentos' && documents.length > 0 && <small className="num">{documents.length}</small>}
+            </button>
+          ))}
         </div>
 
-        <section className="z-card white z-section">
-          <header className="z-section-head">
-            <div><h2 className="t-h1">Anamnese</h2><p className="t-body t-muted">Histórico de saúde, editável ao longo do acompanhamento.</p></div>
-            <button type="button" className="z-btn secondary" onClick={() => setProfileModal(true)}>Editar anamnese</button>
-          </header>
-          {anamnesis.length ? groupFields(anamnesis).map(group => (
-            <div key={group.title} className="z-note-group">
-              <h4 className="t-body-strong t-muted">{group.title}</h4>
-              <dl className="z-deflist">{group.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{display(field, profile[field.key])}</dd></div>)}</dl>
-            </div>
-          )) : <div className="z-empty"><span>Anamnese ainda não preenchida.</span></div>}
-        </section>
+        {tab === 'resumo' && <>
+          <div className="z-alerts">
+            <Alert icon={TriangleAlert} label="Alergias" value={profile.allergies || ''} empty="Não informado, confirmar" warn={Boolean(profile.allergies)} />
+            <Alert icon={HeartPulse} label="Comorbidades" value={profile.comorbidities || ''} empty="Não informado" />
+            <Alert icon={Pill} label="Medicamentos" value={profile.medications || ''} empty="Não informado" />
+            <Alert icon={MessageCircleHeart} label="Como prefere conversar" value={profile.communicationStyle || ''} empty="Não informado" />
+          </div>
+          <Remember patient={patient} />
+          <div className="z-record-glance">
+            <section className="z-card white z-section">
+              <header className="z-section-head"><div><h2 className="t-h2">Próxima consulta</h2></div></header>
+              {nextVisit ? (
+                <p className="z-glance"><b className="num">{formatDate(nextVisit.date, { weekday: 'short', day: '2-digit', month: 'short' })} · {nextVisit.time}</b><span className="t-muted">{nextVisit.type}</span></p>
+              ) : <p className="t-body t-muted">Nenhuma consulta marcada.{onNewAppointment && <> <button type="button" className="z-link" onClick={() => onNewAppointment(patient.id)}>Agendar</button></>}</p>}
+            </section>
+            <section className="z-card white z-section">
+              <header className="z-section-head">
+                <div><h2 className="t-h2">Última evolução</h2></div>
+                {lastNote && <button type="button" className="z-btn ghost sm" onClick={() => setTab('evolucoes')}>Ver todas</button>}
+              </header>
+              {lastNote ? (
+                <p className="z-glance"><b className="num">{formatDate(lastNote.date, { day: '2-digit', month: 'short', year: 'numeric' })}</b><span>{noteSummary(lastNote, allFields)}</span></p>
+              ) : <p className="t-body t-muted">Nenhuma evolução registrada.</p>}
+            </section>
+          </div>
+        </>}
 
-        <section className="z-card white z-section">
-          <header className="z-section-head">
-            <div><h2 className="t-h1">Fotografias</h2><p className="t-body t-muted">Referência, antes e depois, ligadas à data e à consulta.</p></div>
-            <div className="z-row-actions">
-              {media.length > 1 && <button type="button" className="z-btn secondary" onClick={() => setCompare(true)}><Columns2 />Comparar</button>}
-              <button type="button" className="z-btn secondary" onClick={() => setMediaModal(true)}><ImagePlus />Anexar imagem</button>
-            </div>
-          </header>
-          {media.length ? (
-            <div className="z-media-grid">
-              {media.map(item => (
-                <figure key={item.id} className="z-media">
-                  <img src={`/api/media/${encodeURIComponent(item.storageKey)}`} alt={item.caption || MEDIA_KIND[item.kind]} loading="lazy" />
-                  <figcaption>
-                    <span className="z-badge sm">{MEDIA_KIND[item.kind]}</span>
-                    <strong>{item.caption || 'Sem legenda'}</strong>
-                    <small className="t-muted">{formatDate(item.capturedAt)}</small>
-                  </figcaption>
-                  <button type="button" className="z-close z-media-remove" onClick={() => removeMedia(item)} aria-label="Remover imagem"><Trash2 /></button>
-                </figure>
-              ))}
-            </div>
-          ) : <div className="z-empty"><Camera aria-hidden="true" /><span>Nenhuma imagem anexada.</span></div>}
-        </section>
+        {tab === 'anamnese' && (
+          <section className="z-card white z-section">
+            <header className="z-section-head">
+              <div><h2 className="t-h1">Anamnese</h2><p className="t-body t-muted">Histórico de saúde, editável ao longo do acompanhamento.</p></div>
+              <button type="button" className="z-btn secondary" onClick={() => setProfileModal(true)}><UserPen />Editar anamnese</button>
+            </header>
+            {anamnesis.length ? groupFields(anamnesis).map((group, index) => (
+              <details key={group.title} className="z-record-group" open={index === 0 || !compact}>
+                <summary><strong>{group.title}</strong><span className="z-badge sm num">{group.fields.length}</span></summary>
+                <dl className="z-deflist">{group.fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{display(field, profile[field.key])}</dd></div>)}</dl>
+              </details>
+            )) : <div className="z-empty"><span>Anamnese ainda não preenchida.</span><button type="button" className="z-btn brand" onClick={() => setProfileModal(true)}>Preencher anamnese</button></div>}
+          </section>
+        )}
 
-        <section className="z-card white z-section">
-          <header className="z-section-head">
-            <div><h2 className="t-h1">Documentos</h2><p className="t-body t-muted">Receitas, atestados e solicitações com o timbre da clínica.</p></div>
-            <button type="button" className="z-btn secondary" onClick={() => setDocumentModal({})}><FileText />Emitir documento</button>
-          </header>
-          {documents.length ? (
-            <ul className="z-doclist">
-              {documents.map(item => (
-                <li key={item.id}>
-                  <FileText aria-hidden="true" />
-                  <div><strong>{item.title}</strong><small className="t-muted">{formatDate(item.date)} · {proName(item.professionalId)}</small></div>
-                  <div className="z-row-actions">
-                    <button type="button" className="z-btn ghost sm" onClick={() => setDocumentModal({ document: item })}>Editar</button>
-                    <button type="button" className="z-btn secondary sm" onClick={() => print(item)}><Printer />Imprimir</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : <div className="z-empty"><span>Nenhum documento emitido.</span></div>}
-        </section>
-
-        <section className="z-card white z-section">
-          <header className="z-section-head"><div><h2 className="t-h1">Consultas e evolução</h2><p className="t-body t-muted">Cada consulta pode ter uma evolução registrada.</p></div></header>
-          {appointments.length ? (
-            <ul className="z-timeline">
-              {appointments.map(item => {
-                const note = notes.find(entry => entry.appointmentId === item.id);
-                return (
-                  <li key={item.id}>
-                    <div className="z-timeline-date num"><b>{formatDate(item.date, { day: '2-digit', month: 'short', year: 'numeric' })}</b><small>{item.time} · {item.type}</small></div>
-                    <div className="z-timeline-body">
-                      <StatusBadge status={item.status} small />
-                      <p className="t-body t-muted">{note ? noteSummary(note, record.sections.flatMap(section => section.fields)) : 'Sem evolução registrada'}</p>
-                    </div>
-                    <button type="button" className="z-btn ghost sm" onClick={() => setNoteModal({ note, appointmentId: item.id })}>{note ? 'Abrir evolução' : 'Registrar evolução'}</button>
+        {tab === 'evolucoes' && (
+          <section className="z-card white z-section">
+            <header className="z-section-head">
+              <div><h2 className="t-h1">Consultas e evoluções</h2><p className="t-body t-muted">Da mais recente para a mais antiga. Toque para ver a evolução completa.</p></div>
+              <button type="button" className="z-btn secondary" onClick={() => setNoteModal({ appointmentId: '' })}><FilePlus2 />Nova evolução</button>
+            </header>
+            {timeline.length ? (
+              <ol className="z-visits">
+                {timeline.slice(0, visible).map(entry => (
+                  <li key={entry.key}>
+                    <details className="z-visit" open={false}>
+                      <summary>
+                        <span className="z-visit-date num"><b>{formatDate(entry.date, { day: '2-digit', month: 'short' }).replace('.', '')}</b><small>{entry.date.slice(0, 4)}</small></span>
+                        <span className="z-visit-main">
+                          <strong>{entry.appointment ? `${entry.appointment.type} · ${entry.appointment.time}` : 'Anotação geral'}</strong>
+                          <small className="t-muted">{entry.note ? noteSummary(entry.note, allFields) : 'Sem evolução registrada'}</small>
+                        </span>
+                        {entry.appointment && <StatusBadge status={entry.appointment.status} small iconOnly />}
+                      </summary>
+                      <div className="z-visit-body">
+                        {entry.note ? <>
+                          {record.sections.map(section => {
+                            const fields = section.fields.filter(field => hasValue(entry.note?.[field.key]));
+                            return fields.length ? (
+                              <div key={section.id} className="z-note-group">
+                                <h4 className="t-body-strong t-muted">{section.title}</h4>
+                                <dl className="z-deflist">{fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{display(field, entry.note?.[field.key])}</dd></div>)}</dl>
+                              </div>
+                            ) : null;
+                          })}
+                          {entry.note.selectedFindings?.length > 0 && <div className="z-taglist">{entry.note.selectedFindings.map(item => <span key={item} className="z-badge sm">{item}</span>)}</div>}
+                        </> : <p className="t-body t-muted">Nenhuma evolução para esta consulta.</p>}
+                        <button type="button" className="z-btn secondary sm" onClick={() => setNoteModal({ note: entry.note, appointmentId: entry.appointment?.id || entry.note?.appointmentId || '' })}>{entry.note ? 'Editar evolução' : 'Registrar evolução'}</button>
+                      </div>
+                    </details>
                   </li>
-                );
-              })}
-            </ul>
-          ) : <div className="z-empty"><span>Nenhuma consulta para este paciente.</span></div>}
-        </section>
+                ))}
+              </ol>
+            ) : <div className="z-empty"><span>Nenhuma consulta ou evolução para este paciente.</span></div>}
+            {timeline.length > visible && <button type="button" className="z-btn ghost block" onClick={() => setVisible(count => count + 12)}>Mostrar mais ({timeline.length - visible})</button>}
+          </section>
+        )}
 
-        {notes.length > 0 && (
-          <section className="z-notes">
-            {notes.map(note => (
-              <article key={note.id} className="z-card white z-note">
-                <header className="z-section-head">
-                  <div>
-                    <h3 className="t-h2">{formatDate(note.date, { day: '2-digit', month: 'long', year: 'numeric' })}</h3>
-                    <p className="t-body t-muted">{note.appointmentId ? data.appointments.find(item => item.id === note.appointmentId)?.type || 'Atendimento' : 'Anotação geral'}</p>
-                  </div>
-                  <button type="button" className="z-btn ghost sm" onClick={() => setNoteModal({ note, appointmentId: note.appointmentId })}>Editar</button>
-                </header>
-                {record.sections.map(section => {
-                  const fields = section.fields.filter(field => hasValue(note[field.key]));
-                  return fields.length ? (
-                    <div key={section.id} className="z-note-group">
-                      <h4 className="t-body-strong t-muted">{section.title}</h4>
-                      <dl className="z-deflist">{fields.map(field => <div key={field.key}><dt>{field.label}</dt><dd>{display(field, note[field.key])}</dd></div>)}</dl>
+        {tab === 'fotos' && (
+          <section className="z-card white z-section">
+            <header className="z-section-head">
+              <div><h2 className="t-h1">Fotografias</h2><p className="t-body t-muted">Referência, antes e depois, ligadas à data e à consulta.</p></div>
+              <div className="z-row-actions">
+                {media.length > 1 && <button type="button" className="z-btn secondary" onClick={() => setCompare(true)}><Columns2 />Comparar</button>}
+                <button type="button" className="z-btn secondary" onClick={() => setMediaModal(true)}><ImagePlus />Anexar imagem</button>
+              </div>
+            </header>
+            {media.length ? (
+              <div className="z-media-grid">
+                {media.map(item => (
+                  <figure key={item.id} className="z-media">
+                    <img src={`/api/media/${encodeURIComponent(item.storageKey)}`} alt={item.caption || MEDIA_KIND[item.kind]} loading="lazy" />
+                    <figcaption>
+                      <span className="z-badge sm">{MEDIA_KIND[item.kind]}</span>
+                      <strong>{item.caption || 'Sem legenda'}</strong>
+                      <small className="t-muted">{formatDate(item.capturedAt)}</small>
+                    </figcaption>
+                    <button type="button" className="z-close z-media-remove" onClick={() => removeMedia(item)} aria-label="Remover imagem"><Trash2 /></button>
+                  </figure>
+                ))}
+              </div>
+            ) : <div className="z-empty"><Camera aria-hidden="true" /><span>Nenhuma imagem anexada.</span></div>}
+          </section>
+        )}
+
+        {tab === 'documentos' && (
+          <section className="z-card white z-section">
+            <header className="z-section-head">
+              <div><h2 className="t-h1">Documentos</h2><p className="t-body t-muted">Receitas, atestados e solicitações com o timbre da clínica.</p></div>
+              <button type="button" className="z-btn secondary" onClick={() => setDocumentModal({})}><FileText />Emitir documento</button>
+            </header>
+            {documents.length ? (
+              <ul className="z-doclist">
+                {documents.map(item => (
+                  <li key={item.id}>
+                    <FileText aria-hidden="true" />
+                    <div><strong>{item.title}</strong><small className="t-muted">{formatDate(item.date)} · {proName(item.professionalId)}</small></div>
+                    <div className="z-row-actions">
+                      <button type="button" className="z-btn ghost sm" onClick={() => setDocumentModal({ document: item })}>Editar</button>
+                      <button type="button" className="z-btn secondary sm" onClick={() => print(item)}><Printer />Imprimir</button>
                     </div>
-                  ) : null;
-                })}
-                {note.selectedFindings?.length > 0 && <div className="z-taglist">{note.selectedFindings.map(item => <span key={item} className="z-badge sm">{item}</span>)}</div>}
-              </article>
-            ))}
+                  </li>
+                ))}
+              </ul>
+            ) : <div className="z-empty"><span>Nenhum documento emitido.</span></div>}
           </section>
         )}
       </>}
