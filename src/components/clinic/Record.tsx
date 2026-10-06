@@ -5,6 +5,7 @@ import { Camera, CalendarPlus, ClipboardList, LayoutGrid, NotebookPen, Columns2,
 import { MAIN_PROFESSIONAL, type Access, type Brand, type Professional } from '@/lib/clinic/permissions';
 import { DocumentModal, printDocument } from './Documents';
 import { Modal } from '@/components/ui/Modal';
+import { upload } from '@vercel/blob/client';
 import { Field } from '@/components/ui/Field';
 import { ageFrom, formatDate } from '@/lib/clinic/format';
 import { emptyProfile, makeId, type Appointment, type ClinicalDocument, type ClinicalNote, type MediaAttachment, type Patient, type PatientProfile, type Store } from '@/lib/clinic/store';
@@ -285,7 +286,7 @@ export function Record({ data, setData, patientId, onSelectPatient, onEditPatien
       )}
       {compare && patient && <CompareModal media={media} kinds={MEDIA_KIND} onClose={() => setCompare(false)} />}
       {mediaModal && patient && (
-        <MediaModal kinds={MEDIA_KIND} appointments={appointments} patientId={patient.id} onClose={() => setMediaModal(false)} onError={onError} onSaved={item => { setData(current => ({ ...current, media: [item, ...current.media] })); setMediaModal(false); }} />
+        <MediaModal clinicId={access?.clinicId || ''} kinds={MEDIA_KIND} appointments={appointments} patientId={patient.id} onClose={() => setMediaModal(false)} onError={onError} onSaved={item => { setData(current => ({ ...current, media: [item, ...current.media] })); setMediaModal(false); }} />
       )}
     </>
   );
@@ -436,7 +437,7 @@ function ProfileModal({ fields, profile, onClose, onSave }: { fields: TemplateFi
   );
 }
 
-function MediaModal({ kinds: MEDIA_KIND, appointments, patientId, onClose, onSaved, onError }: { kinds: Record<MediaAttachment['kind'], string>; appointments: Appointment[]; patientId: string; onClose: () => void; onSaved: (item: MediaAttachment) => void; onError: (message: string) => void }) {
+function MediaModal({ clinicId, kinds: MEDIA_KIND, appointments, patientId, onClose, onSaved, onError }: { clinicId: string; kinds: Record<MediaAttachment['kind'], string>; appointments: Appointment[]; patientId: string; onClose: () => void; onSaved: (item: MediaAttachment) => void; onError: (message: string) => void }) {
   const [busy, setBusy] = useState(false);
   const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -448,13 +449,9 @@ function MediaModal({ kinds: MEDIA_KIND, appointments, patientId, onClose, onSav
     const item: MediaAttachment = { id, patientId, appointmentId: String(form.get('appointmentId') || ''), kind: String(form.get('kind')) as MediaAttachment['kind'], caption: String(form.get('caption') || ''), capturedAt: String(form.get('capturedAt') || new Date().toISOString().slice(0, 10)), mimeType: file.type, sizeBytes: file.size, storageKey: id, createdAt: new Date().toISOString() };
     setBusy(true);
     try {
-      const upload = new FormData();
-      upload.append('image', file, file.name);
-      upload.append('metadata', JSON.stringify(item));
-      const response = await fetch('/api/media', { method: 'POST', body: upload });
-      if (!response.ok) throw new Error((await response.json()).error || 'Falha ao enviar a imagem.');
-      const stored = await response.json();
-      onSaved({ ...item, storageKey: stored.id });
+      // Envio direto ao Vercel Blob privado; o servidor só libera o caminho da própria clínica.
+      await upload(`clinicas/${clinicId}/fotos/${id}`, file, { access: 'private', handleUploadUrl: '/api/media/upload', contentType: file.type });
+      onSaved(item);
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Não foi possível salvar a imagem.');
     } finally {

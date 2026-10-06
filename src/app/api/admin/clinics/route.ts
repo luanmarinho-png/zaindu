@@ -1,6 +1,6 @@
-import { GridFSBucket } from 'mongodb';
 import { NextRequest, NextResponse } from 'next/server';
 import { audits } from '@/lib/audit';
+import { deleteClinicImages } from '@/lib/media';
 import { removeLogin } from '@/lib/supabase/admin';
 import { brandOf, clinics, DEFAULT_COLOR, ensureDefaultClinic, members, states, templateOr } from '@/lib/auth';
 import { cleanLogo, COLOR, fail, noStore, readJson, requireAdmin } from '@/lib/api';
@@ -103,10 +103,7 @@ export async function DELETE(request: NextRequest) {
     const team = await members(db).find({ clinicId: id }, { projection: { _id: 1 } }).toArray();
     for (const member of team) await removeLogin(member._id).catch(() => {});
     await members(db).deleteMany({ clinicId: id });
-    // Fotos antigas, de antes do multi-clínica, não têm clinicId e pertencem à "main".
-    const bucket = new GridFSBucket(db, { bucketName: 'patient_images' });
-    const filter = id === 'main' ? { $or: [{ 'metadata.clinicId': 'main' }, { 'metadata.clinicId': { $exists: false } }] } : { 'metadata.clinicId': id };
-    for (const file of await bucket.find(filter, { projection: { _id: 1 } }).toArray()) await bucket.delete(file._id).catch(() => {});
+    await deleteClinicImages(db, id);
     await states(db).deleteOne({ _id: id });
     await audits(db).deleteMany({ clinicId: id });
     await clinics(db).deleteOne({ _id: id });

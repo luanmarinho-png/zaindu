@@ -1,14 +1,14 @@
-import { GridFSBucket, ObjectId } from 'mongodb';
-import { Readable } from 'node:stream';
 import { NextRequest, NextResponse } from 'next/server';
 import { getAccess } from '@/lib/auth';
-import { getDatabase } from '@/lib/mongodb';
+import { MEDIA_ID, saveImage } from '@/lib/media';
 import { SAFE_IMAGE } from '@/lib/api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
 
+// Envio pelo servidor (até 4,5 MB, limite da Vercel). Usado na migração de fotos antigas do navegador;
+// a tela de anexar envia direto ao Blob por /api/media/upload, sem esse limite.
 export async function POST(request: NextRequest) {
   try {
     const access = await getAccess();
@@ -21,17 +21,9 @@ export async function POST(request: NextRequest) {
     if (file.size > MAX_IMAGE_BYTES) return NextResponse.json({ error: 'A imagem deve ter até 12 MB.' }, { status: 413 });
     const metadata = JSON.parse(rawMetadata) as Record<string, unknown>;
     const requestedId = String(metadata.storageKey || '');
-    const id = ObjectId.isValid(requestedId) ? new ObjectId(requestedId) : new ObjectId();
-    const database = await getDatabase();
-    const bucket = new GridFSBucket(database, { bucketName: 'patient_images' });
-    const upload = bucket.openUploadStreamWithId(id, file.name.slice(0, 180), {
-      metadata: { clinicId: access.clinicId, contentType: file.type, patientId: String(metadata.patientId || ''), appointmentId: String(metadata.appointmentId || ''), kind: String(metadata.kind || '') },
-    });
-    const contents = Buffer.from(await file.arrayBuffer());
-    await new Promise<void>((resolve, reject) => {
-      Readable.from(contents).pipe(upload).on('error', reject).on('finish', resolve);
-    });
-    return NextResponse.json({ uploaded: true, id: id.toHexString() }, { status: 201 });
+    const id = MEDIA_ID.test(requestedId) ? requestedId : crypto.randomUUID();
+    await saveImage(access.clinicId, id, Buffer.from(await file.arrayBuffer()), file.type);
+    return NextResponse.json({ uploaded: true, id }, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'Não foi possível guardar a imagem no armazenamento privado.' }, { status: 503 });
   }
