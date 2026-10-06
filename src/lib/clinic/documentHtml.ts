@@ -24,6 +24,7 @@ const escape = (text: string) => text.replace(/[&<>"']/g, char => ({ '&': '&amp;
 export function documentHtml(document: ClinicalDocument, patient: Patient, settings: ClinicSettings, brand: Brand | null, professional: Professional | undefined, autoPrint = true): string {
   const color = brand?.color && !isLightColor(brand.color) ? brand.color : '#2e2e30';
   const logo = brand?.logo ? `<img src="${brand.logo}" alt="" class="logo">` : `<span class="logo mark">${escape((settings.clinicName || 'C').slice(0, 1).toUpperCase())}</span>`;
+  const watermark = brand?.logo ? `<div class="watermark" aria-hidden="true"><img src="${brand.logo}" alt=""></div>` : `<div class="watermark" aria-hidden="true"><span>${escape((settings.clinicName || 'C').slice(0, 1).toUpperCase())}</span></div>`;
   const signer = professional || { name: settings.professionalName, registry: settings.professionalRegistry, specialty: settings.specialty };
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${escape(document.title)} · ${escape(patient.name)}</title>
 <style>
@@ -41,7 +42,12 @@ export function documentHtml(document: ClinicalDocument, patient: Patient, setti
   footer { margin-top: 48px; display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; font-size: 11pt; }
   .sign { min-width: 260px; text-align: center; border-top: 1px solid #1c1d20; padding-top: 6px; }
   .sign small { display: block; color: #6b6b6b; font-size: 10pt; }
+  /* Marca d'água: logo (ou inicial) bem clara no canto inferior direito, em todas as páginas. */
+  .watermark { position: fixed; right: 0; bottom: 0; width: 64mm; height: 64mm; opacity: .06; pointer-events: none; z-index: -1; }
+  .watermark img { width: 100%; height: 100%; object-fit: contain; }
+  .watermark span { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 14mm; background: ${color}; color: #fff; font: 600 40mm/1 Inter, sans-serif; }
 </style></head><body>
+${watermark}
 <header>${logo}<div><strong>${escape(settings.clinicName)}</strong><small>${escape(signer.specialty || settings.specialty || '')}</small></div></header>
 <h1>${escape(document.title)}</h1>
 <p class="patient">Paciente: <b>${escape(patient.name)}</b>${patient.cpf ? ` · CPF ${escape(maskCpf(patient.cpf))}` : ''}</p>
