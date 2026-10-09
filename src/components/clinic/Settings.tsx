@@ -7,7 +7,7 @@ import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
 import { applyBrand, isLightColor } from '@/lib/clinic/brand';
 import { formatDate } from '@/lib/clinic/format';
-import { canManageTeam, type Access, type Brand } from '@/lib/clinic/permissions';
+import { canManageTeam, canRead, type Access, type Brand, type Professional } from '@/lib/clinic/permissions';
 import { makeId, servicePrice, type ClinicSettings } from '@/lib/clinic/store';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { brl } from '@/lib/clinic/format';
@@ -19,24 +19,26 @@ import { PageHeader } from './Shell';
 import { Team } from './Team';
 import type { ClinicProps } from './types';
 import { Select } from '@/components/ui/Select';
+import { MessageSettings } from './MessageSettings';
 
-type Tab = 'clinica' | 'prontuario' | 'equipe' | 'historico';
-type Props = ClinicProps & { access?: Access; brand?: Brand | null; onBrandChange?: (brand: Brand) => void };
+type Tab = 'clinica' | 'prontuario' | 'mensagens' | 'equipe' | 'historico';
+type Props = ClinicProps & { access?: Access; brand?: Brand | null; onBrandChange?: (brand: Brand) => void; professionals?: Professional[] };
 
 const MAX_LOGO_BYTES = 300 * 1024;
 
-export function Settings({ data, setData, access, brand = null, onBrandChange }: Props) {
+export function Settings({ data, setData, access, brand = null, onBrandChange, professionals = [] }: Props) {
   const [tab, setTab] = useState<Tab>('clinica');
   const manager = access ? canManageTeam(access) : false;
   const set = (patch: Partial<ClinicSettings>) => setData(current => ({ ...current, settings: { ...current.settings, ...patch } }));
   const tabs: [Tab, string, typeof Building2][] = [
     ['clinica', 'Clínica', Building2],
     ['prontuario', 'Prontuário', ClipboardList],
+    ['mensagens', 'Mensagens', Mail],
     ...(manager ? [['equipe', 'Equipe e acessos', Users], ['historico', 'Histórico', History]] as [Tab, string, typeof Building2][] : []),
   ];
   return (
     <>
-      <PageHeader title="Configurações" subtitle="Deixe o sistema com a cara da clínica: identidade, prontuário e equipe." />
+      <PageHeader title="Configurações" subtitle="Ajuste a identidade, o prontuário, as mensagens e a equipe da clínica." />
       <div className="z-tabs" role="tablist" aria-label="Seções das configurações">
         {tabs.map(([id, label, Icon]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}><Icon aria-hidden="true" />{label}</button>)}
       </div>
@@ -63,6 +65,7 @@ export function Settings({ data, setData, access, brand = null, onBrandChange }:
         <EditableList title="Checklist clínico" hint="Achados marcáveis em cada evolução do prontuário." values={data.settings.trichoscopyFindings} onChange={values => set({ trichoscopyFindings: values })} />
       </>}
       {tab === 'prontuario' && <RecordEditor record={data.settings.record} findings={data.settings.trichoscopyFindings} onChange={record => set({ record })} />}
+      {tab === 'mensagens' && <MessageSettings settings={data.settings} patients={data.patients} canChoosePatients={!access || canRead('patients', access.modules)} professionals={professionals} previewOnly={!access} onChange={messages => set({ messages })} />}
       {tab === 'equipe' && access?.clinicId && <Team access={access} clinicId={access.clinicId} embedded />}
       {tab === 'historico' && access?.clinicId && <AuditLog clinicId={access.clinicId} />}
     </>

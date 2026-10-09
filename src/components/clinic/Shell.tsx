@@ -43,10 +43,10 @@ export function Shell({ view, onNavigate, settings, brand, access, scheduledCoun
     <div className={`z-shell ${collapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
       <aside className="z-sidebar" id="clinic-sidebar" aria-label="Menu da clínica">
         <div className="z-sidebar-top">
-          <div className="z-brand">
+          <button type="button" className="z-brand z-brand-home" onClick={() => go('Visão geral')} aria-label="Ir para a visão geral">
             {mark}
             <span className="z-brand-name">{settings.clinicName}</span>
-          </div>
+          </button>
           <button type="button" className="z-close z-collapse" onClick={() => setCollapsed(value => !value)} aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}>
             {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
           </button>
@@ -79,7 +79,7 @@ export function Shell({ view, onNavigate, settings, brand, access, scheduledCoun
       <div className="z-main">
         <header className="z-mobilebar">
           <button type="button" className="z-close" onClick={() => setMobileOpen(true)} aria-label="Abrir menu" aria-expanded={mobileOpen} aria-controls="clinic-sidebar"><Menu /></button>
-          <div className="z-brand">{mark}<span className="z-brand-name">{settings.clinicName}</span></div>
+          <button type="button" className="z-brand z-brand-home" onClick={() => go('Visão geral')} aria-label="Ir para a visão geral">{mark}<span className="z-brand-name">{settings.clinicName}</span></button>
           <span className="z-avatar sm">{initial}</span>
         </header>
         <main className="z-content">{children}</main>

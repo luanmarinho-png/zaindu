@@ -12,11 +12,12 @@ import { Patients } from '@/components/clinic/Patients';
 import { Record } from '@/components/clinic/Record';
 import { Settings } from '@/components/clinic/Settings';
 import { Shell } from '@/components/clinic/Shell';
+import { WelcomeModal } from '@/components/clinic/WelcomeModal';
 import { Team } from '@/components/clinic/Team';
 import { canView, type ClinicView } from '@/components/clinic/types';
 import { Toast } from '@/components/ui/Toast';
 import { applyBrand } from '@/lib/clinic/brand';
-import { blankUnreadable, canWrite, STORE_KEYS, type Access, type Brand, type Professional } from '@/lib/clinic/permissions';
+import { blankUnreadable, canWrite, STORE_KEYS, type Access, type Brand, type CalendarInvitee, type Professional } from '@/lib/clinic/permissions';
 import { cleanLocalStore, dayKey, initial, KEY, monthKey, readImageBlob, type Appointment, type Patient, type Store } from '@/lib/clinic/store';
 
 type AppointmentDraft = { appointment?: Appointment; date: string; patientId?: string };
@@ -42,6 +43,8 @@ export default function Home() {
   const [access, setAccess] = useState<Access | null>(null);
   const [brand, setBrand] = useState<Brand | null>(null);
   const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [calendarInvitees, setCalendarInvitees] = useState<CalendarInvitee[]>([]);
+  const [welcome, setWelcome] = useState(false);
   const [professionalFilter, setProfessionalFilter] = useState('');
   const [state, setState] = useState<AccessState | 'authenticated'>('checking');
   const [accessError, setAccessError] = useState('');
@@ -115,8 +118,10 @@ export default function Home() {
         saved.current = snapshotOf(next);
         setData(next);
         setAccess(who);
+        setWelcome(Boolean(body.welcome));
         setBrand(body.brand);
         setProfessionals(body.professionals || []);
+        setCalendarInvitees(body.calendarInvitees || []);
         // Quem atende abre a agenda já filtrada na própria; os demais veem todos.
         setProfessionalFilter(who.professional ? who.email : '');
         version.current = body.version || 0;
@@ -165,6 +170,7 @@ export default function Home() {
         if (!body.version || body.version === version.current || !body.data) return;
         version.current = body.version;
         setProfessionals(body.professionals || []);
+        setCalendarInvitees(body.calendarInvitees || []);
         const remote = blankUnreadable(cleanLocalStore(body.data as Partial<Store>), access.modules);
         setData(current => {
           const next = { ...current } as Record<keyof Store, unknown>;
@@ -230,13 +236,15 @@ export default function Home() {
         {current === 'Financeiro' && <Finance professionals={professionals} data={data} setData={setData} month={month} onMonthChange={setMonth} />}
         {current === 'Equipe' && access.clinicId && <Team access={access} clinicId={access.clinicId} />}
         {current === 'Todos os dias' && <Daily />}
-        {current === 'Configurações' && <Settings data={data} setData={setData} access={access} brand={brand} onBrandChange={setBrand} />}
+        {current === 'Configurações' && <Settings data={data} setData={setData} professionals={professionals} access={access} brand={brand} onBrandChange={setBrand} />}
       </Shell>
 
+      {welcome && <WelcomeModal name={access.name} clinicName={data.settings.clinicName} professionalName={data.settings.professionalName} message={data.settings.messages?.welcome} onDismiss={async () => { const response = await fetch('/api/clinic/welcome', { method: 'POST' }); if (!response.ok) throw new Error('Não foi possível salvar. Tente novamente.'); setWelcome(false); }} />}
       {appointmentDraft && (
         <AppointmentModal
           showMoney={can('financeiro')}
           professionals={professionals}
+          calendarInvitees={calendarInvitees}
           initialProfessionalId={professionalFilter}
           data={data}
           appointment={appointmentDraft.appointment}

@@ -6,6 +6,15 @@
 .z-sidebar { position: sticky; top: 0; display: flex; flex-direction: column; gap: 24px; height: 100dvh; padding: 20px 14px 16px; background: var(--sc-card); border-right: 1px solid var(--sc-border); overflow: hidden; z-index: 30; }
 .z-sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 40px; }
 .z-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.z-brand-home { padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.z-brand-home:focus-visible { outline: 2px solid var(--sc-brand); outline-offset: 5px; border-radius: 10px; }
+.z-welcome { display: grid; gap: 16px; line-height: 1.6; }
+.z-welcome p { margin: 0; }
+.z-welcome-icon { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; background: var(--sc-brand-soft); color: var(--sc-brand); }
+.z-btn.calendar:not(:disabled) { --calendar-from: #2563eb; --calendar-to: #1d4ed8; color: #fff; background: linear-gradient(135deg, var(--calendar-from), var(--calendar-to)); }
+@media (hover: hover) and (pointer: fine) {
+  .z-btn.calendar:hover:not(:disabled) { background: linear-gradient(135deg, #1d4ed8, #1e40af); color: #fff; }
+}
 .z-brand img { width: 36px; height: 36px; flex: none; border-radius: 10px; }
 .z-brand-name { font: 500 15px/1.2 var(--sc-font-heading); color: var(--sc-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .z-mobile-close { display: none; }
@@ -712,3 +721,24 @@ a.z-close { color: var(--sc-ink-muted); }
 .z-admin > .z-tabs { justify-self: start; }
 @media (max-width: 720px) { .z-answers { grid-template-columns: 1fr; } .z-answers-list { position: static; max-height: none; grid-auto-flow: column; grid-auto-columns: 70%; overflow-x: auto; } }
 .z-save-state { font-size: 12px; }
+
+/* Mensagens configuráveis, com a mesma prévia do modal de boas-vindas. */
+.z-message-editor { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.z-message-preview { display: grid; gap: 20px; padding: 24px; border-radius: var(--sc-radius-card); background: var(--sc-surface); box-shadow: var(--sc-inner-100); overflow-wrap: anywhere; }
+.z-message-preview p { margin: 0; white-space: pre-wrap; line-height: 1.7; }
+.z-message-audience { display: grid; gap: 8px; margin-top: 20px; overflow-wrap: anywhere; }
+.z-message-audience p { margin: 0; line-height: 1.6; }
+.z-message-compose { display: grid; gap: 10px; }
+.z-message-input { min-height: 48px; border: 1px solid var(--sc-border); border-radius: var(--sc-radius-field); padding: 14px 16px; background: var(--sc-surface); box-shadow: var(--sc-inner-100); font: inherit; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; }
+.z-message-input.multiline { min-height: 230px; }
+.z-message-input:focus { outline: 2px solid var(--sc-brand); outline-offset: 2px; }
+.z-message-token { display: inline; border-radius: 6px; padding: 2px 6px; background: var(--sc-info-soft); color: var(--sc-info); font-size: .9em; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.z-message-patients { max-height: 240px; overflow-y: auto; overscroll-behavior: contain; border-radius: var(--sc-radius-card); box-shadow: var(--sc-inner-100); padding: 8px; }
+.z-message-patient { display: flex; gap: 12px; align-items: center; padding: 12px; cursor: pointer; }
+.z-message-patient input { flex: 0 0 auto; width: 18px; height: 18px; accent-color: var(--sc-ink); }
+.z-message-patient span { display: grid; gap: 4px; min-width: 0; overflow-wrap: anywhere; }
+.z-message-patient small { color: var(--sc-ink-muted); }
+.z-message-patient:has(input:disabled) { opacity: .6; cursor: default; }
+.z-message-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0 12px; }
+@media (max-width: 1000px) { .z-message-editor { grid-template-columns: 1fr; } }
+@media (max-width: 560px) { .z-message-actions .z-btn { width: 100%; } }

@@ -1,3 +1,4 @@
+import { MESSAGE_KINDS, normalizeAudience, normalizeMessages } from '@/lib/clinic/messages';
 import type { Db } from 'mongodb';
 import { NextRequest, NextResponse } from 'next/server';
 import { brandOf, clinics, getAccess, members, states } from '@/lib/auth';
@@ -100,8 +101,11 @@ export async function GET() {
       if (Array.isArray(visible.appointments)) visible.appointments = visible.appointments.map(item => { const { price: _price, ...rest } = item as Record<string, unknown>; return rest; });
       if (Array.isArray(visible.services)) visible.services = (visible.services as Service[]).map(item => ({ id: item.id, name: item.name, duration: item.duration, knowledgeCost: 0, items: [] }));
     }
+    const team = await members(database).find({ clinicId: access.clinicId }, { projection: { _id: 1, name: 1, calendarEmail: 1, welcomeSeenAt: 1 } }).sort({ name: 1 }).toArray();
+    const calendarInvitees = access.modules.includes('agenda') ? team.map(item => ({ id: item._id, name: item.name, email: item.calendarEmail || '' })) : [];
+    const welcome = access.role !== 'admin' && team.some(item => item._id === access.email && !item.welcomeSeenAt);
     const professionals = await professionalsOf(database, access.clinicId, (data?.settings || {}) as Record<string, unknown>);
-    return NextResponse.json({ data: visible, brand: brandOf(clinic), access, professionals, version: document?.updatedAt?.getTime() || 0 }, { headers: noStore });
+    return NextResponse.json({ data: visible, brand: brandOf(clinic), access, professionals, calendarInvitees, welcome, version: document?.updatedAt?.getTime() || 0 }, { headers: noStore });
   } catch {
     return NextResponse.json({ error: 'Não foi possível conectar ao MongoDB. Confira MONGODB_URI e MONGODB_DB na Vercel.' }, { status: 503, headers: noStore });
   }
@@ -124,6 +128,18 @@ export async function PUT(request: NextRequest) {
     if (!sent.length) return NextResponse.json({ saved: true }, { headers: noStore });
     const database = await getDatabase();
     const before = ((await states(database).findOne({ _id: access.clinicId }, { projection: Object.fromEntries([...sent, 'patients'].map(key => [`data.${key}`, 1])) }))?.data || {}) as Record<string, unknown>;
+    if (sent.includes('settings')) {
+      const settings = incoming.settings as Record<string, unknown>;
+      if ('messages' in settings) {
+        const patientIds = new Set((Array.isArray(before.patients) ? before.patients : []).map(idOf));
+        const messages = normalizeMessages(settings.messages);
+        for (const kind of MESSAGE_KINDS) {
+          const audience = normalizeAudience(messages[kind].audience);
+          messages[kind].audience = { ...audience, patientIds: audience.patientIds.filter(id => patientIds.has(id)) };
+        }
+        incoming.settings = { ...settings, messages };
+      }
+    }
     if (sent.includes('patients')) {
       const guarded = await guardPatients(database, access.clinicId, access.modules, incoming.patients as Record<string, unknown>[]);
       if (typeof guarded === 'string') return NextResponse.json({ error: guarded }, { status: 403 });

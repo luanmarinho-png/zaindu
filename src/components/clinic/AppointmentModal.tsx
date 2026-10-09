@@ -1,15 +1,16 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { CalendarDays, Clock, NotebookPen, Stethoscope, Timer, TriangleAlert, User, UserRoundCog, Wallet, Trash2 } from 'lucide-react';
+import { CalendarDays, CalendarPlus, Clock, Mail, NotebookPen, Stethoscope, Timer, TriangleAlert, User, UserRoundCog, Wallet, Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Field } from '@/components/ui/Field';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { brl, minutesOf, timeOf } from '@/lib/clinic/format';
-import { MAIN_PROFESSIONAL, type Professional } from '@/lib/clinic/permissions';
+import { MAIN_PROFESSIONAL, type Professional, type CalendarInvitee } from '@/lib/clinic/permissions';
 import { findService, makeId, normalizePatient, servicePrice, type Appointment, type Store } from '@/lib/clinic/store';
 import { PatientPicker, Remember, StatusSegment } from './common';
 import { Select } from '@/components/ui/Select';
+import { calendarGuestEmail, googleCalendarUrl } from '@/lib/clinic/googleCalendar';
 
 const DURATIONS = [15, 30, 45, 60, 90, 120];
 
@@ -24,11 +25,12 @@ type Props = {
   onClose: () => void;
   showMoney?: boolean;
   professionals?: Professional[];
+  calendarInvitees?: CalendarInvitee[];
   // Profissional já escolhido (filtro da agenda ou o próprio usuário, quando ele atende).
   initialProfessionalId?: string;
 };
 
-export function AppointmentModal({ data, appointment, initialDate, initialPatientId = '', onSave, onDelete, onCreatePatient, onClose, showMoney = true, professionals = [], initialProfessionalId = '' }: Props) {
+export function AppointmentModal({ data, appointment, initialDate, initialPatientId = '', onSave, onDelete, onCreatePatient, onClose, showMoney = true, professionals = [], calendarInvitees = [], initialProfessionalId = '' }: Props) {
   // Tipos vêm dos atendimentos do Financeiro (com duração e preço); sem eles, da lista antiga das Configurações.
   const types = data.services.length ? data.services.map(item => item.name) : data.settings.appointmentTypes.length ? data.settings.appointmentTypes : ['Consulta'];
   const [patientId, setPatientId] = useState(appointment?.patientId || initialPatientId);
@@ -43,6 +45,8 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
   const [notes, setNotes] = useState(appointment?.notes || '');
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [calendarGuestId, setCalendarGuestId] = useState('');
+  const calendarGuest = calendarInvitees.find(item => item.id === calendarGuestId)?.email || '';
 
   // Preço do atendimento de mesmo nome: o definido no Financeiro ou custo + margem.
   const suggested = useMemo(() => {
@@ -66,6 +70,12 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
 
   const effectivePrice = !priceTouched && suggested !== null && !price ? suggested : price;
   const patientName = (id: string) => data.patients.find(patient => patient.id === id)?.name || 'Paciente';
+  const calendarPatient = appointment ? data.patients.find(patient => patient.id === appointment.patientId) : undefined;
+  const calendarPatientEmail = calendarPatient && calendarGuestEmail(calendarPatient.email);
+  const calendarUrl = appointment ? googleCalendarUrl(appointment, '', calendarPatient) : null;
+  const calendarInviteUrl = appointment && (!calendarGuestId || calendarGuestEmail(calendarGuest)) ? googleCalendarUrl(appointment, calendarGuest, calendarPatient) : null;
+  const invalidCalendarGuest = Boolean(calendarGuestId && !calendarGuestEmail(calendarGuest));
+  const calendarChanged = Boolean(appointment && (patientId !== appointment.patientId || date !== appointment.date || time !== appointment.time || duration !== appointment.duration || status !== appointment.status));
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -97,7 +107,7 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
           <Select id="appt-type" value={type} ariaLabel="Tipo de atendimento" onChange={chooseType} options={[...types, ...(types.includes(type) ? [] : [type])].map(item => { const service = findService(data.services, item); return { value: item, label: item, hint: service?.duration ? `${service.duration} min` : undefined }; })} />
         </Field>
         {showMoney && (
-          <Field label="Valor" icon={Wallet} htmlFor="appt-price" hint={suggested !== null ? `Sugerido: ${brl(suggested)}` : undefined}>
+          <Field label="Valor" icon={Wallet} htmlFor="appt-price" full hint={suggested !== null ? `Sugerido: ${brl(suggested)}` : undefined}>
             <MoneyInput id="appt-price" value={effectivePrice} onChange={value => { setPrice(value); setPriceTouched(true); }} />
           </Field>
         )}
@@ -115,7 +125,7 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
         )}
         <Field label="Duração" icon={Timer} full>
           <div className="z-segment" role="group" aria-label="Duração">
-            {DURATIONS.map(minutes => <button key={minutes} type="button" aria-pressed={duration === minutes} onClick={() => setDuration(minutes)}>{minutes} min</button>)}
+            {[...new Set([...DURATIONS, duration])].sort((a, b) => a - b).map(minutes => <button key={minutes} type="button" aria-pressed={duration === minutes} onClick={() => setDuration(minutes)}>{minutes} min</button>)}
           </div>
         </Field>
         {conflicts.length > 0 && (
@@ -132,6 +142,18 @@ export function AppointmentModal({ data, appointment, initialDate, initialPatien
         <Field label="Observações" icon={NotebookPen} full htmlFor="appt-notes">
           <textarea id="appt-notes" className="z-textarea" rows={3} placeholder="Opcional" value={notes} onChange={event => setNotes(event.target.value)} />
         </Field>
+        {calendarUrl && <>
+          <div className="z-field full"><span className="z-label">Paciente no Google Agenda</span><p className="z-hint">{calendarPatientEmail ? `Nome no evento: ${calendarPatient?.name}. Convite para ${calendarPatientEmail}.` : `Nome no evento: ${calendarPatient?.name || 'Paciente'}. Cadastre um e-mail válido no paciente para convidá-lo também.`}</p></div>
+          <Field label="Convidar alguém da clínica (opcional)" icon={Mail} full htmlFor="appt-calendar-guest" hint="Escolha uma pessoa da equipe desta clínica. O Google envia o convite após você salvar e confirmar." error={invalidCalendarGuest ? 'Cadastre o e-mail do Google Agenda desta pessoa em Equipe.' : undefined}>
+            <Select id="appt-calendar-guest" value={calendarGuestId} onChange={setCalendarGuestId} ariaLabel="Convidar alguém da clínica" options={[{ value: '', label: 'Não convidar' }, ...calendarInvitees.map(item => ({ value: item.id, label: item.name, hint: item.email || 'E-mail do Google Agenda não cadastrado' }))]} />
+          </Field>
+          <div className="z-field full">
+            {calendarChanged || !calendarInviteUrl
+              ? <button type="button" className="z-btn calendar" disabled><CalendarPlus aria-hidden="true" />Adicionar ao Google Agenda</button>
+              : <a className="z-btn calendar" href={calendarInviteUrl} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer"><CalendarPlus aria-hidden="true" />Adicionar ao Google Agenda</a>}
+            <span className="z-hint">{calendarChanged ? 'Salve as alterações e reabra a consulta para adicionar o horário atualizado.' : invalidCalendarGuest ? 'Cadastre o e-mail em Equipe ou selecione “Não convidar”.' : calendarPatientEmail || calendarGuest.trim() ? 'Abre o Google com os convidados preenchidos. Escolha sua conta, salve e confirme o envio dos convites. Alterações posteriores precisam ser feitas no Google também.' : 'Abre em outra aba. Escolha sua conta e salve no Google. Remarcações e cancelamentos precisam ser atualizados lá também.'}</span>
+          </div>
+        </>}
       </div>
     </Modal>
   );

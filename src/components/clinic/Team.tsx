@@ -9,7 +9,7 @@ import { DEFAULT_MEMBER_MODULES, MODULES, ROLE_LABEL, type Access, type AccessPr
 import { PageHeader } from './Shell';
 import { Select } from '@/components/ui/Select';
 
-export type TeamMember = { email: string; username: string; name: string; role: 'manager' | 'member'; profileId: string; modules: Module[]; professional: { specialty: string; registry: string } | null };
+export type TeamMember = { email: string; username: string; name: string; role: 'manager' | 'member'; profileId: string; modules: Module[]; calendarEmail?: string; professional: { specialty: string; registry: string } | null };
 type Draft = { member?: TeamMember };
 
 async function call(method: string, body: Record<string, unknown>, path = '/api/team') {
@@ -154,6 +154,7 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
 }) {
   const [name, setName] = useState(member?.name || '');
   const [username, setUsername] = useState(member?.username || '');
+  const [calendarEmail, setCalendarEmail] = useState(member?.calendarEmail || '');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [role, setRole] = useState<TeamMember['role']>(member?.role || (isAdmin && firstMember ? 'manager' : 'member'));
@@ -185,8 +186,8 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
     setError('');
     try {
       const result = member
-        ? await call('PATCH', { clinicId, email: member.email, name, profileId, modules, professional, ...(isAdmin ? { role } : {}), ...(password ? { password } : {}) })
-        : await call('POST', { clinicId, name, username, password, role, profileId, modules, professional });
+        ? await call('PATCH', { clinicId, email: member.email, name, calendarEmail, profileId, modules, professional, ...(isAdmin ? { role } : {}), ...(password ? { password } : {}) })
+        : await call('POST', { clinicId, name, calendarEmail, username, password, role, profileId, modules, professional });
       onSaved(result.message || 'Alterações salvas.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível salvar.');
@@ -207,6 +208,9 @@ function MemberModal({ profiles, clinicId, member, isAdmin, firstMember, onClose
         <Field label="Nome" required icon={UserRound} htmlFor="t-name"><input id="t-name" className="z-input" required value={name} onChange={event => setName(event.target.value)} placeholder="Ex.: Ana Souza" /></Field>
         <Field label="Usuário" required icon={AtSign} htmlFor="t-user" hint={member ? 'O usuário não muda.' : 'É o que a pessoa digita para entrar.'}>
           <input id="t-user" className="z-input" required disabled={Boolean(member)} autoCapitalize="none" spellCheck={false} value={username} onChange={event => setUsername(event.target.value.toLowerCase().replace(/[^a-z0-9._-]/g, ''))} placeholder="ana.souza" />
+        </Field>
+        <Field label="E-mail do Google Agenda" icon={AtSign} htmlFor="t-calendar-email" hint="Opcional. Usado para convites da agenda." full>
+          <input id="t-calendar-email" className="z-input" type="email" maxLength={254} value={calendarEmail} onChange={event => setCalendarEmail(event.target.value)} placeholder="nome@gmail.com" />
         </Field>
         <Field label={member ? 'Nova senha' : 'Senha'} required={!member} icon={KeyRound} htmlFor="t-pass" hint={member ? 'Deixe em branco para manter a atual.' : 'Mínimo de 8 caracteres.'} full>
           <div className="z-inputwrap">

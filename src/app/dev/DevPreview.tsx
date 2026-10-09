@@ -12,6 +12,7 @@ import { Record } from '@/components/clinic/Record';
 import { Settings } from '@/components/clinic/Settings';
 import { Daily } from '@/components/clinic/Daily';
 import { Shell } from '@/components/clinic/Shell';
+import { WelcomeModal } from '@/components/clinic/WelcomeModal';
 import { Team } from '@/components/clinic/Team';
 import { canView, type ClinicView } from '@/components/clinic/types';
 import { ALL_MODULES, blankUnreadable, type Access } from '@/lib/clinic/permissions';
@@ -22,8 +23,8 @@ function fixture(): Store {
   const today = new Date();
   const day = (offset: number) => { const d = new Date(today); d.setDate(d.getDate() + offset); return dayKey(d); };
   const patients = [
-    normalizePatient({ id: 'p1', name: 'Mariana Alves Costa', phone: '(11) 98765-4321', birthDate: '1990-04-12', insuranceType: 'Convênio', insuranceName: 'Unimed' }),
-    normalizePatient({ id: 'p2', name: 'Roberto Lima', phone: '(11) 91234-5678', birthDate: '1978-09-03' }),
+    normalizePatient({ id: 'p1', name: 'Mariana Alves Costa', email: 'mariana@example.com', phone: '(11) 98765-4321', birthDate: '1990-04-12', insuranceType: 'Convênio', insuranceName: 'Unimed' }),
+    normalizePatient({ id: 'p2', name: 'Roberto Lima', email: 'roberto@example.com', phone: '(11) 91234-5678', birthDate: '1978-09-03' }),
     normalizePatient({ id: 'p3', name: 'Ana Beatriz Souza', socialName: 'Bia', phone: '(21) 99876-1122' }),
   ];
   const appointments: Appointment[] = [
@@ -49,7 +50,8 @@ function devFixture(access: Access, template?: string): Store {
   return blankUnreadable(base, access.modules);
 }
 
-export function DevPreview({ papel, modelo }: { papel?: string; modelo?: string }) {
+export function DevPreview({ papel, modelo, boasVindas = false }: { papel?: string; modelo?: string; boasVindas?: boolean }) {
+  const [welcome, setWelcome] = useState(boasVindas);
   const [access] = useState<Access>(() => devAccess(papel));
   const [data, setData] = useState<Store>(() => devFixture(access, modelo));
   const [view, setView] = useState<ClinicView>('Visão geral');
@@ -70,7 +72,8 @@ export function DevPreview({ papel, modelo }: { papel?: string; modelo?: string 
         {view === 'Configurações' && <Settings data={data} setData={setData} />}
         {view === 'Equipe' && <Team access={access} clinicId="dev" />}
       </Shell>
-      {appt && <AppointmentModal showMoney={access.modules.includes('financeiro')} data={data} appointment={appt.appointment} initialDate={appt.date} onCreatePatient={name => { const p = quickPatient(name); setData(d => ({ ...d, patients: [p, ...d.patients] })); return p.id; }} onClose={() => setAppt(null)} onSave={a => { setData(d => ({ ...d, appointments: [...d.appointments.filter(x => x.id !== a.id), a] })); setAppt(null); }} onDelete={id => { setData(d => ({ ...d, appointments: d.appointments.filter(x => x.id !== id) })); setAppt(null); }} />}
+      {welcome && <WelcomeModal name={access.name} clinicName={data.settings.clinicName} professionalName={data.settings.professionalName} message={data.settings.messages?.welcome} onDismiss={async () => { setWelcome(false); }} />}
+      {appt && <AppointmentModal calendarInvitees={[{ id: 'medica-teste', name: 'Dra. Teste Silva', email: 'medica.qa@example.com' }, { id: 'recepcao-teste', name: 'Recepção Teste', email: 'recepcao.qa@example.com' }, { id: 'sem-email', name: 'Pessoa sem e-mail', email: '' }]} showMoney={access.modules.includes('financeiro')} data={data} appointment={appt.appointment} initialDate={appt.date} onCreatePatient={name => { const p = quickPatient(name); setData(d => ({ ...d, patients: [p, ...d.patients] })); return p.id; }} onClose={() => setAppt(null)} onSave={a => { setData(d => ({ ...d, appointments: [...d.appointments.filter(x => x.id !== a.id), a] })); setAppt(null); }} onDelete={id => { setData(d => ({ ...d, appointments: d.appointments.filter(x => x.id !== id) })); setAppt(null); }} />}
       {patientDraft && <PatientModal patient={patientDraft.patient} onSave={p => { setData(d => ({ ...d, patients: [...d.patients.filter(x => x.id !== p.id), p] })); setPatientDraft(null); }} onClose={() => setPatientDraft(null)} />}
     </>
   );

@@ -6,6 +6,7 @@ export type Role = 'admin' | 'manager' | 'member';
 // professional = a própria pessoa atende pacientes e tem agenda (id = e-mail).
 export type Access = { email: string; name: string; role: Role; clinicId: string | null; modules: Module[]; professional?: boolean };
 export type Professional = { id: string; name: string; specialty: string; registry: string };
+export type CalendarInvitee = { id: string; name: string; email: string };
 export const MAIN_PROFESSIONAL = 'principal';
 export type Brand = { id: string; name: string; color: string; logo: string };
 

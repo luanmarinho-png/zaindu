@@ -5,5 +5,5 @@ import { DevPreview } from './DevPreview';
 export default async function DevPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   if (process.env.NODE_ENV === 'production' || process.env.VERCEL_ENV === 'production') notFound();
   const params = await searchParams;
-  return <DevPreview papel={params.papel} modelo={params.modelo} />;
+  return <DevPreview papel={params.papel} modelo={params.modelo} boasVindas={params.boasvindas === '1'} />;
 }

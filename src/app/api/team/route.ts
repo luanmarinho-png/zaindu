@@ -5,6 +5,7 @@ import { fail, noStore, readJson, teamScope as scope } from '@/lib/api';
 import { recordAudit } from '@/lib/audit';
 import { getDatabase } from '@/lib/mongodb';
 import { cleanModules, DEFAULT_MEMBER_MODULES, type AccessProfile } from '@/lib/clinic/permissions';
+import { calendarGuestEmail } from '@/lib/clinic/googleCalendar';
 import { removeLogin, upsertLogin, type LoginResult } from '@/lib/supabase/admin';
 
 export const runtime = 'nodejs';
@@ -16,7 +17,7 @@ const view = (item: MemberDoc, profiles: AccessProfile[]) => ({
   email: item._id, username: item._id.replace(/@zaindu\.app$/, ''), name: item.name, role: item.role,
   profileId: item.profileId && profiles.some(profile => profile.id === item.profileId) ? item.profileId : '',
   modules: memberModules(item, profiles),
-  professional: item.professional || null,
+  professional: item.professional || null, calendarEmail: item.calendarEmail || '',
 });
 
 // Profissional atende pacientes, tem agenda própria e assina documentos (registro = CRM/CRBM/COREN etc.).
@@ -65,6 +66,8 @@ export async function POST(request: NextRequest) {
     const email = emailFromLogin(String(body?.username || ''));
     const name = String(body?.name || '').trim().slice(0, 80);
     const password = String(body?.password || '');
+    const calendarEmail = String(body?.calendarEmail || '').trim();
+    if (calendarEmail && !calendarGuestEmail(calendarEmail)) return fail('Informe um e-mail válido para o Google Agenda.', 400);
     const role = target.access.role === 'admin' && body?.role === 'manager' ? 'manager' : 'member';
     if (!name) return fail('Informe o nome.', 400);
     if (!/^[a-z0-9._-]+@zaindu\.app$/.test(email) || !isClinicEmail(email)) return fail('Usuário pode ter só letras, números, ponto, hífen e sublinhado.', 400);
@@ -85,7 +88,7 @@ export async function POST(request: NextRequest) {
     if (result instanceof Error) return fail(result.message.includes('password') ? 'Senha recusada pelo Supabase. Use uma senha mais forte.' : result.message, 400);
     const now = new Date();
     const professional = professionalFrom(body);
-    const doc: MemberDoc = { _id: email, clinicId: target.clinicId, role, name, modules: chosen.modules, ...(chosen.profileId ? { profileId: chosen.profileId } : {}), ...(professional ? { professional } : {}), createdAt: now, updatedAt: now };
+    const doc: MemberDoc = { _id: email, clinicId: target.clinicId, role, name, calendarEmail, modules: chosen.modules, ...(chosen.profileId ? { profileId: chosen.profileId } : {}), ...(professional ? { professional } : {}), createdAt: now, updatedAt: now };
     await members(db).insertOne(doc);
     await recordAudit(db, target.clinicId, target.access, [`Pessoa adicionada à equipe: ${name} (${role === 'manager' ? 'gestora' : profiles.find(item => item.id === chosen.profileId)?.name || 'personalizado'})`]).catch(() => {});
     return NextResponse.json({ member: view(doc, profiles), login: result, message: loginMessage(result) }, { status: 201, headers: noStore });
@@ -113,6 +116,12 @@ export async function PATCH(request: NextRequest) {
     }
     const unset: Record<string, ''> = {};
     const changes: string[] = [];
+    if (body && 'calendarEmail' in body) {
+      const calendarEmail = String(body.calendarEmail || '').trim();
+      if (calendarEmail && !calendarGuestEmail(calendarEmail)) return fail('Informe um e-mail válido para o Google Agenda.', 400);
+      update.calendarEmail = calendarEmail;
+      if (calendarEmail !== (member.calendarEmail || '')) changes.push('e-mail do Google Agenda atualizado');
+    }
     if (body && 'professional' in body) {
       const professional = professionalFrom(body);
       if (professional) update.professional = professional; else unset.professional = '';
@@ -138,7 +147,7 @@ export async function PATCH(request: NextRequest) {
       update.sessionsValidAfter = new Date();
       changes.push('senha trocada');
     }
-    await members(db).updateOne({ _id: email }, { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
+    await members(db).updateOne({ _id: email, clinicId: target.clinicId }, { $set: update, ...(Object.keys(unset).length ? { $unset: unset } : {}) });
     if (changes.length) await recordAudit(db, target.clinicId, target.access, [`${update.name || member.name}: ${changes.join(', ')}`]).catch(() => {});
     if (body?.revoke === true && !password) message = `Sessões de ${member.name} encerradas em todos os aparelhos.`;
     return NextResponse.json({ saved: true, message }, { headers: noStore });

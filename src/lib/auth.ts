@@ -14,7 +14,7 @@ export const DEFAULT_COLOR = '#647055';
 export type ClinicDoc = { _id: string; name: string; color: string; logo: string; template: TemplateId; profiles?: AccessProfile[]; createdAt: Date; updatedAt: Date };
 // modules guarda o último acesso aplicado; com profileId, vale o que o perfil disser no momento.
 // professional: atende pacientes, tem agenda própria e assina documentos. sessionsValidAfter: sessões abertas antes disso deixam de valer.
-export type MemberDoc = { _id: string; clinicId: string; role: 'manager' | 'member'; name: string; modules: string[]; profileId?: string; professional?: { specialty: string; registry: string }; sessionsValidAfter?: Date; createdAt: Date; updatedAt: Date };
+export type MemberDoc = { _id: string; clinicId: string; role: 'manager' | 'member'; name: string; modules: string[]; profileId?: string; calendarEmail?: string; welcomeSeenAt?: Date; professional?: { specialty: string; registry: string }; sessionsValidAfter?: Date; createdAt: Date; updatedAt: Date };
 export type StateDoc = { _id: string; data: Record<string, unknown>; updatedAt?: Date };
 
 export function isClinicEmail(email: string | undefined): boolean {

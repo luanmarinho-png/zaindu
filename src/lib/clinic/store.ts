@@ -1,5 +1,6 @@
 // Modelo de dados da clínica, valores iniciais e migração de registros antigos.
 import { recordFromTemplate, resolveRecord, TEMPLATES, type RecordConfig } from './templates';
+import { normalizeMessages, type ClinicMessages } from './messages';
 
 export type PatientAddress = { cep: string; street: string; number: string; complement: string; district: string; city: string; state: string };
 export type Patient = {
@@ -18,7 +19,7 @@ export type Appointment = { id: string; patientId: string; date: string; time: s
 export type PatientProfile = Record<string, string>;
 export type ClinicalNote = { id: string; patientId: string; appointmentId: string; date: string; selectedFindings: string[]; [field: string]: string | string[] };
 export type MediaAttachment = { id: string; patientId: string; appointmentId: string; kind: 'patient' | 'before' | 'after' | 'trichoscopy'; caption: string; capturedAt: string; mimeType: string; sizeBytes: number; storageKey: string; createdAt: string };
-export type ClinicSettings = { clinicName: string; professionalName: string; specialty: string; professionalRegistry: string; showDailyVerse?: boolean;
+export type ClinicSettings = { clinicName: string; professionalName: string; specialty: string; professionalRegistry: string; showDailyVerse?: boolean; messages?: ClinicMessages;
   // Papel timbrado e contatos que saem no rodapé dos documentos.
   letterhead?: string; letterheadWatermark?: boolean; clinicPhone?: string; clinicEmail?: string; clinicAddress?: string; clinicWebsite?: string; clinicInstagram?: string; appointmentTypes: string[]; trichoscopyFindings: string[]; record: RecordConfig };
 export type Supply = { id:string; name:string; category:string; unit:string; unitCost:number; defaultQty:number };
@@ -86,7 +87,7 @@ export function cleanLocalStore(value: Partial<Store> | null | undefined): Store
     services: value?.services || legacyServices(value?.supplies || initial.supplies, value?.knowledgeCost ?? initial.knowledgeCost),
     knowledgeCost: value?.knowledgeCost ?? initial.knowledgeCost,
     targetMargin: value?.targetMargin ?? initial.targetMargin,
-    settings: { ...defaultSettings, ...(value?.settings || {}), record: resolveRecord(value?.settings?.record) },
+    settings: { ...defaultSettings, ...(value?.settings || {}), messages: normalizeMessages(value?.settings?.messages), record: resolveRecord(value?.settings?.record) },
     monthlyCosts: value?.monthlyCosts || {},
   };
 }
