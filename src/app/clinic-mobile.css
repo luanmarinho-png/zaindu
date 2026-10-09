@@ -1,0 +1,75 @@
+/* Comportamento do painel em telas pequenas; não altera a landing page. */
+@media (max-width: 860px) {
+  html:has(.z-shell, .z-access, .z-admin),
+  body:has(.z-shell, .z-access, .z-admin) {
+    overflow-x: clip;
+    overscroll-behavior: none;
+  }
+
+  /* O menu/modal recebe a rolagem; a tela ao fundo fica parada. */
+  html:has(.z-shell.mobile-open, .z-overlay),
+  body:has(.z-shell.mobile-open, .z-overlay) {
+    overflow-y: hidden;
+  }
+
+  .z-shell, .z-main, .z-content, .z-admin, .z-access {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .z-content > *, .z-admin > * { min-width: 0; }
+  .z-section-head > * { min-width: 0; max-width: 100%; }
+  .z-section-head .z-row-actions { flex-wrap: wrap; }
+  .z-sidebar { overflow-y: auto; overscroll-behavior: none; }
+  .z-dialog-body, .z-combobox-list, .z-dropdown-pop ul { overscroll-behavior: none; }
+
+  /* Mantém o zoom por gesto, mas evita o zoom automático ao focar no iOS. */
+  :is(.z-shell, .z-access, .z-admin, .z-overlay, .z-dropdown-pop)
+  :is(input:not([type='checkbox']):not([type='radio']):not([type='color']), select, textarea) {
+    font-size: 16px;
+  }
+
+  :is(.z-shell, .z-access, .z-admin, .z-overlay, .z-dropdown-pop, .z-toast)
+  :is(button, a, input, select, textarea, summary, label) {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  /* Retira entradas/lifts decorativos; indicadores de carregamento continuam. */
+  .z-content, .z-admin, .z-overlay, .z-dialog, .z-dialog.z-drawer,
+  .z-toast, .z-scrim, .z-combobox-list, .z-dropdown-pop,
+  .z-team-embedded, .z-chart-tip, .z-qgroup-body { animation: none; }
+
+  :is(.z-shell, .z-access, .z-admin, .z-overlay, .z-dropdown-pop, .z-toast),
+  :is(.z-shell, .z-access, .z-admin, .z-overlay, .z-dropdown-pop, .z-toast) *,
+  :is(.z-shell, .z-access, .z-admin, .z-overlay, .z-dropdown-pop, .z-toast) *::before,
+  :is(.z-shell, .z-access, .z-admin, .z-overlay, .z-dropdown-pop, .z-toast) *::after {
+    transition: none;
+  }
+
+  .z-mobilebar { background: var(--sc-surface); backdrop-filter: none; }
+  .z-btn { max-width: 100%; white-space: normal; text-align: center; padding-block: 8px; }
+  .z-btn svg { flex: none; }
+  .z-tabs { flex-wrap: wrap; overflow-x: clip; }
+  .z-drawer-nav { flex-wrap: wrap; overflow-x: clip; }
+  .z-drawer-nav a { white-space: normal; overflow-wrap: anywhere; }
+}
+
+@media (max-width: 860px) {
+  /* As tabelas já são cartões no mobile: campos não podem alargar a grade. */
+  .z-table, .z-table tbody { display: block; width: 100%; }
+  .z-table { min-width: 0; border-spacing: 0; }
+  .z-table thead { display: none; }
+  .z-table tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 10px; padding: 12px; margin-bottom: 8px; border-radius: var(--sc-radius-field); background: var(--sc-card); box-shadow: var(--sc-shadow-100); position: relative; }
+  .z-table td, .z-table td:first-child, .z-table td:last-child { width: auto !important; padding: 0; min-width: 0; overflow-wrap: anywhere; }
+  .z-table td[data-label] { display: grid; gap: 4px; }
+  .z-table td[data-label]::before { content: attr(data-label); font: 600 11px var(--sc-font); color: var(--sc-ink-muted); }
+  .z-table td:first-child { grid-column: 1 / -1; }
+  .z-table td:last-child:not([data-label]) { position: absolute; top: 8px; right: 8px; }
+  .z-table td:first-child[data-label] { padding-right: 36px; }
+  .z-table :is(.z-input, .z-inputwrap) { width: 100%; min-width: 0; }
+  .z-table-wrap { overflow-x: clip; }
+  .z-answers-list { grid-auto-flow: row; grid-auto-columns: auto; overflow-x: clip; }
+  .z-service-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .z-service-row > span:nth-child(2), .z-service-row > span:nth-child(3), .z-service-row > span:nth-child(5) { display: none; }
+}

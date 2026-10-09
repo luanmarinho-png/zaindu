@@ -82,7 +82,9 @@ button, [role='button'], summary { touch-action: manipulation; }
 .z-card.flat { box-shadow: var(--sc-inner-200); }
 .z-card.white { background: var(--sc-card); }
 .z-card.interactive { cursor: pointer; }
-.z-card.interactive:hover { box-shadow: var(--sc-shadow-300); transform: translateY(-2px); }
+@media (hover: hover) and (pointer: fine) {
+  .z-card.interactive:hover { box-shadow: var(--sc-shadow-300); transform: translateY(-2px); }
+}
 .z-card.interactive:active { transform: none; }
 
 /* Botões: pílula, gradiente, button-indicator */
@@ -91,18 +93,30 @@ button, [role='button'], summary { touch-action: manipulation; }
 .z-btn:active { transform: scale(.98); }
 .z-btn:disabled { background: linear-gradient(135deg, #c3c3c3, #d4d4d4); color: #666; cursor: not-allowed; transform: none; box-shadow: none; }
 .z-btn.brand { background: linear-gradient(135deg, var(--sc-brand-from), var(--sc-brand-to)); color: var(--sc-brand-ink); }
-.z-btn.brand:hover:not(:disabled) { background: linear-gradient(135deg, var(--sc-brand-hover-from), var(--sc-brand-hover-to)); }
+@media (hover: hover) and (pointer: fine) {
+  .z-btn.brand:hover:not(:disabled) { background: linear-gradient(135deg, var(--sc-brand-hover-from), var(--sc-brand-hover-to)); }
+}
 .z-btn.brand:active:not(:disabled) { background: var(--sc-brand-active); }
 .z-btn.primary { background: linear-gradient(135deg, #292929, #3c3c3c); }
-.z-btn.primary:hover:not(:disabled) { background: linear-gradient(135deg, #434343, #555); }
+@media (hover: hover) and (pointer: fine) {
+  .z-btn.primary:hover:not(:disabled) { background: linear-gradient(135deg, #434343, #555); }
+}
 .z-btn.secondary { color: var(--sc-ink); background: linear-gradient(135deg, #f5f5f5, #fafafa); }
-.z-btn.secondary:hover:not(:disabled) { background: linear-gradient(135deg, #dcdcdc, #ececec); }
+@media (hover: hover) and (pointer: fine) {
+  .z-btn.secondary:hover:not(:disabled) { background: linear-gradient(135deg, #dcdcdc, #ececec); }
+}
 .z-btn.ghost { color: var(--sc-ink); background: transparent; box-shadow: none; }
-.z-btn.ghost:hover:not(:disabled) { background: linear-gradient(135deg, #dcdcdc, #eee); }
+@media (hover: hover) and (pointer: fine) {
+  .z-btn.ghost:hover:not(:disabled) { background: linear-gradient(135deg, #dcdcdc, #eee); }
+}
 .z-btn.danger { background: linear-gradient(135deg, #7f0e1b, #90202d); }
-.z-btn.danger:hover:not(:disabled) { background: linear-gradient(135deg, #ac1628, #bf293b); }
+@media (hover: hover) and (pointer: fine) {
+  .z-btn.danger:hover:not(:disabled) { background: linear-gradient(135deg, #ac1628, #bf293b); }
+}
 .z-btn.danger-ghost { color: var(--sc-danger); background: transparent; box-shadow: none; }
-.z-btn.danger-ghost:hover:not(:disabled) { background: var(--sc-danger-soft); }
+@media (hover: hover) and (pointer: fine) {
+  .z-btn.danger-ghost:hover:not(:disabled) { background: var(--sc-danger-soft); }
+}
 .z-btn.sm { min-height: 32px; padding: 0 16px; font-size: 12px; line-height: 16px; }
 .z-btn.lg { min-height: 48px; padding: 0 32px; font-size: 16px; }
 .z-btn.icon { width: 40px; min-height: 40px; padding: 0; }
@@ -133,7 +147,9 @@ button, [role='button'], summary { touch-action: manipulation; }
 .z-segment { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: var(--sc-radius-control); background: var(--sc-soft); box-shadow: var(--sc-inner-100); }
 .z-segment button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border: 0; border-radius: var(--sc-radius-control); background: transparent; color: var(--sc-ink-muted); font: 600 12px var(--sc-font); letter-spacing: .02em; cursor: pointer; transition: background var(--sc-fast) var(--sc-ease), color var(--sc-fast) var(--sc-ease), box-shadow var(--sc-fast) var(--sc-ease); }
 .z-segment button svg { width: 14px; height: 14px; }
-.z-segment button:hover { color: var(--sc-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .z-segment button:hover { color: var(--sc-ink); }
+}
 .z-segment button[aria-pressed='true'] { background: var(--sc-card); color: var(--sc-ink); box-shadow: var(--sc-chip-border); }
 .z-segment button[aria-pressed='true'].tone-success { color: var(--sc-success); }
 .z-segment button[aria-pressed='true'].tone-danger { color: var(--sc-danger); }
@@ -152,7 +168,9 @@ button, [role='button'], summary { touch-action: manipulation; }
 
 /* Chip (ação leve, seleção) */
 .z-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border: 0; border-radius: var(--sc-radius-control); background: oklch(92.19% 0 0 / .5); color: var(--sc-ink); font: 600 12px var(--sc-font); box-shadow: var(--sc-chip-border); cursor: pointer; transition: background var(--sc-fast) var(--sc-ease); }
-.z-chip:hover { background: oklch(92.19% 0 0); }
+@media (hover: hover) and (pointer: fine) {
+  .z-chip:hover { background: oklch(92.19% 0 0); }
+}
 .z-chip svg { width: 14px; height: 14px; }
 
 /* Diálogo */
@@ -166,7 +184,9 @@ button, [role='button'], summary { touch-action: manipulation; }
 .z-dialog-foot { display: flex; align-items: center; gap: 8px; padding: 16px 32px 28px; border-top: 1px solid var(--sc-border); background: var(--sc-surface); }
 .z-dialog-foot .spacer { flex: 1; }
 .z-close { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border: 0; border-radius: 50%; background: transparent; color: var(--sc-ink-muted); cursor: pointer; transition: background var(--sc-fast) var(--sc-ease), color var(--sc-fast) var(--sc-ease); }
-.z-close:hover { background: oklch(92.19% 0 0 / .6); color: var(--sc-ink); }
+@media (hover: hover) and (pointer: fine) {
+  .z-close:hover { background: oklch(92.19% 0 0 / .6); color: var(--sc-ink); }
+}
 .z-close svg { width: 18px; height: 18px; }
 .z-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .z-form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
