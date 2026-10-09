@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Eye, EyeOff, LogIn, RotateCw } from 'lucide-react';
+import { ArrowUpRight, Eye, EyeOff, LogIn, RotateCw } from 'lucide-react';
 import type { Access } from '@/lib/clinic/permissions';
 
 export type AccessState = 'checking' | 'setup' | 'login' | 'loading' | 'error';
@@ -71,6 +71,7 @@ export function Login({ state, error, onAuthenticated }: { state: AccessState; e
               </div>
               {formError && <p className="z-callout danger" role="alert">{formError}</p>}
               <button type="submit" className="z-btn brand lg block" disabled={submitting}><LogIn />{submitting ? 'Entrando…' : 'Entrar'}</button>
+              <a className="z-btn ghost block" href="https://lp.zaindu.app" target="_blank" rel="noopener noreferrer">Conheça o ZAINDU<ArrowUpRight aria-hidden="true" /></a>
             </form>
           </>}
         </div>
