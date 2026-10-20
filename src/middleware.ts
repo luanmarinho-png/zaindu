@@ -12,6 +12,13 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname === '/lp' || request.nextUrl.pathname.startsWith('/lp/')) {
     return NextResponse.next();
   }
+  if (request.nextUrl.pathname.startsWith('/presente/') || request.nextUrl.pathname.startsWith('/api/presentes/')) {
+    const response = NextResponse.next();
+    response.headers.set('Cache-Control', 'no-store, private');
+    response.headers.set('Referrer-Policy', 'no-referrer');
+    response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+    return response;
+  }
   return updateSession(request);
 }
 

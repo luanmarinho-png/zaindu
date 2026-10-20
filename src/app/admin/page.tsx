@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Building2, ChevronDown, FileJson, Trash2, ImagePlus, LogIn, LogOut, Palette, Pencil, Plus, Stethoscope, UserRound, Users } from 'lucide-react';
 import { Team } from '@/components/clinic/Team';
 import { FormsAdmin } from '@/components/admin/FormsAdmin';
+import { PrizesAdmin } from '@/components/admin/PrizesAdmin';
 import { Field } from '@/components/ui/Field';
 import { Modal } from '@/components/ui/Modal';
 import { Toast } from '@/components/ui/Toast';
@@ -31,7 +32,13 @@ export default function AdminPage() {
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState<ClinicRow | 'new' | null>(null);
   const [open, setOpen] = useState('');
-  const [area, setArea] = useState<'clinicas' | 'formularios'>(() => (typeof window !== 'undefined' && location.hash === '#formularios' ? 'formularios' : 'clinicas'));
+  const [area, setArea] = useState<'clinicas' | 'formularios' | 'premios'>('clinicas');
+
+  useEffect(() => {
+    const sync = () => setArea(location.hash === '#premios' ? 'premios' : location.hash === '#formularios' ? 'formularios' : 'clinicas');
+    sync(); window.addEventListener('hashchange', sync);
+    return () => window.removeEventListener('hashchange', sync);
+  }, []);
 
   const load = useCallback(async () => {
     const response = await fetch('/api/admin/clinics', { cache: 'no-store' });
@@ -68,10 +75,11 @@ export default function AdminPage() {
         <button type="button" className="z-btn ghost sm" onClick={logout}><LogOut />Sair</button>
       </header>
       <div className="z-tabs" role="tablist" aria-label="Áreas da administração">
-        <button type="button" role="tab" aria-selected={area === 'clinicas'} onClick={() => setArea('clinicas')}><Building2 aria-hidden="true" />Clínicas</button>
-        <button type="button" role="tab" aria-selected={area === 'formularios'} onClick={() => setArea('formularios')}><FileJson aria-hidden="true" />Formulários</button>
+        <button type="button" role="tab" aria-selected={area === 'clinicas'} onClick={() => { location.hash = 'clinicas'; }}><Building2 aria-hidden="true" />Clínicas</button>
+        <button type="button" role="tab" aria-selected={area === 'formularios'} onClick={() => { location.hash = 'formularios'; }}><FileJson aria-hidden="true" />Formulários</button>
+        <button type="button" role="tab" aria-selected={area === 'premios'} onClick={() => { location.hash = 'premios'; }}><Users aria-hidden="true" />Presentes</button>
       </div>
-      {area === 'formularios' ? <FormsAdmin /> : <>
+      {area === 'premios' ? <PrizesAdmin /> : area === 'formularios' ? <FormsAdmin /> : <>
       <header className="z-pagehead">
         <div>
           <h1 className="t-display">Clínicas</h1>
